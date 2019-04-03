@@ -2,17 +2,18 @@
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
 # TO DO:
-# Add conditional expression
-#	Test all original features + new expression
+# How does 3 address code go from step 1 to step 2, in what format / program?
 # Do Task 1
-# input from file
-# translate to 3 address code
+# 	fix end of file syntax error
+# 	translate to 3 address code  frontend-tac-output.txt
 #	temporary variables array
 # 	check output file
+# 	Add conditional expression
 # Do Task 3
 # ask user inputs for variables
 # print out variable values at the end
 # Add labels
+# Read notes
 # Pick Task 2
 
 calc: calc.l calc.y

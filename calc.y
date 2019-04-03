@@ -3,9 +3,11 @@
 // CPEG 621 Lab 2 - Calculator Compiler Back End
 
 #include <ctype.h>
-#include <stdio.h>
-#include <string.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #define MAX_NUM_VARS 32			// Max number of declared variables allowed
 #define MAX_VAR_NAME_LEN 32 	// How long a variable name can be
 
@@ -25,7 +27,9 @@ struct variable {
 
 struct variable vars[MAX_NUM_VARS];		// Holds declared variables
 int num_vars = 0;						// Current amount of variables declared
+
 int lineNum = 1;						// Used for debugging
+FILE * yyin;							// Input file pointer
 %}
 
 %token INTEGER POWER VARIABLE	// bison adds these #defines in calc.tab.h for use in flex
@@ -46,10 +50,11 @@ int lineNum = 1;						// Used for debugging
 // Make grammar unambiguous
 // Low to high precedence and associativity within a precedent rank
 // https://en.cppreference.com/w/c/language/operator_precedence
+%precedence '?'
 %left '+' '-'
 %left '*' '/'
-%precedence  '!'		// Unary bitwise not; No associativity b/c it is unary
-%right POWER			// ** exponent operator
+%precedence '!'		// Unary bitwise not; No associativity b/c it is unary
+%right POWER		// ** exponent operator
 
 %start calc
 
@@ -78,6 +83,7 @@ expr :
 	| '!' expr		  { $$ = ~$2; }
 	| expr POWER expr { $$ = (int)pow($1, $3); }
 	| '(' expr ')'    { $$ = $2; }		// Will give syntax error for unmatched parens
+	// | '(' expr ')' '?' '(' expr ')' { $$ = ($2 != 0) ? $6 : 0; }
 	;
 
 %%
@@ -195,8 +201,19 @@ void yyerror(char *s)
 	printf("%s\n", s);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+	// Open the input program file
+	if (argc != 2)
+	{
+		printf("Need to provide input file\n");
+		exit(1);
+	}
+	else
+	{
+		yyin = fopen(argv[1], "r");
+	}
+	
 	// Initialize variable names and values as null/zero
 	int i;
 	for (i = 0; i < MAX_NUM_VARS; i++)
@@ -206,5 +223,8 @@ int main()
 	}
 	
 	yyparse();
+	
+	fclose(yyin);
+	
 	return 0;
 }

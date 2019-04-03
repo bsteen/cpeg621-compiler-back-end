@@ -1,0 +1,5 @@
+B = 3
+A = B + C * 1
+C = (D * 2)
+testVAR = (C + 10) / 2
+Testvar = testvar ** a
