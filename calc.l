@@ -15,7 +15,7 @@ void yyerror(char *);	// Defined in calc.y
 
 %%
 
-[A-Za-z][A-Za-z0-9]* {		// Variable names are case insensitive
+[A-Za-z][A-Za-z0-9]* {	// Variable names are case insensitive
 	#ifdef DEBUG
 	printf("token %s at line %d\n", yytext, lineNum);
 	#endif
@@ -41,7 +41,7 @@ void yyerror(char *);	// Defined in calc.y
 	return POWER;
 	}
 
-[-+()=*/!?] {
+[-+()=*/!?]	{
 		#ifdef DEBUG
 		printf("token %s at line %d\n", yytext, lineNum);
 		#endif
@@ -62,7 +62,7 @@ void yyerror(char *);	// Defined in calc.y
 	#ifdef DEBUG
 	printf("token is whitespace(s) at line %d\n", lineNum);
 	#endif
-	// Ignore whitespaces
+	// Ignore whitespaces (return nothing)
 	}
 
 .	{ yyerror("invalid character"); }

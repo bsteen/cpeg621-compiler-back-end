@@ -30,6 +30,7 @@ int num_vars = 0;						// Current amount of variables declared
 
 int lineNum = 1;						// Used for debugging
 FILE * yyin;							// Input file pointer
+FILE * output;							// Output file pointer
 %}
 
 %token INTEGER POWER VARIABLE	// bison adds these #defines in calc.tab.h for use in flex
@@ -90,7 +91,7 @@ expr :
 
 // Convert a string to lower case
 // Use to this to help enforce variable names being case insensitive
-char* lc(char* str)
+char* lc(char *str)
 {
 	int i;
 	for (i = 0; i < strlen(str); i++)
@@ -213,6 +214,8 @@ int main(int argc, char *argv[])
 	{
 		yyin = fopen(argv[1], "r");
 	}
+	
+	
 	
 	// Initialize variable names and values as null/zero
 	int i;
