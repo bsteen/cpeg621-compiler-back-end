@@ -1,13 +1,14 @@
 %{
 // Benjamin Steenkamer
-// CPEG 621 - Lab 1, part 1
+// CPEG 621, Lab 2 - Calculator Compiler Back End
+
 #include <stdlib.h> // for atoi call
 #include <string.h>
-#include "infix.tab.h"
+#include "calc.tab.h"
 
-//#define DEBUG 			// for debugging: print tokens and their line numbers
+// #define DEBUG 			// for debugging: print tokens and their line numbers
 extern int lineNum; 	// line number from cal.tab.c
-void yyerror(char *);	// Defined in infix.y
+void yyerror(char *);	// Defined in calc.y
 %}
 
 %%

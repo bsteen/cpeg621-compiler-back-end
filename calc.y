@@ -1,11 +1,12 @@
 %{
 // Benjamin Steenkamer
-// CPEG 621 - Lab 1, part 1
+// CPEG 621, Lab 2 - Calculator Compiler Back End
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#define MAX_NUM_VARS 30			// Max number of declared variables allowed
-#define MAX_VAR_NAME_LEN 20 	// How long a variable name can be
+#define MAX_NUM_VARS 32			// Max number of declared variables allowed
+#define MAX_VAR_NAME_LEN 32 	// How long a variable name can be
 
 int yylex(void);						// Will be generated in lex.yy.c by flex
 
@@ -17,7 +18,7 @@ int create_var(char *);
 void print_var_create_error(int);
 
 struct variable {
-	char name[MAX_VAR_NAME_LEN + 1];	// Allocate space for max var name + \0
+	char name[MAX_VAR_NAME_LEN + 1];	// Allocate space for max var name length + \0
 	int value;
 };
 
@@ -26,7 +27,7 @@ int num_vars = 0;						// Current amount of variables declared
 int lineNum = 1;						// Used for debugging
 %}
 
-%token INTEGER POWER VARIABLE	// bison adds these #defines in infix.tab.h for use in flex
+%token INTEGER POWER VARIABLE	// bison adds these #defines in calc.tab.h for use in flex
 
 // Union defines all possible values a token can have associated with it
 // Allow yylval to hold either an integer or a string (for variable name)
@@ -49,12 +50,12 @@ int lineNum = 1;						// Used for debugging
 %precedence  '!'		// Unary bitwise not; No associativity b/c it is unary
 %right POWER			// ** exponent operator
 
-%start infix
+%start calc
 
 %%
 
-infix :
-	infix statement '\n'
+calc :
+	calc statement '\n'
 	|
 	;
 
@@ -178,7 +179,14 @@ void yyerror(char *s)
 
 int main()
 {
-	memset(vars, 0, sizeof(int) * MAX_NUM_VARS);	// Initialize variables to zero
+	// Initialize variable names and values
+	int i;
+	for (i = 0; i < MAX_NUM_VARS; i++)
+	{
+		memset(vars[i].name, 0, MAX_VAR_NAME_LEN + 1);
+		vars[i].value = 0;
+	}
+	
 	yyparse();
 	return 0;
 }
