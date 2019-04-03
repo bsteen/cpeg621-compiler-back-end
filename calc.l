@@ -1,6 +1,6 @@
 %{
 // Benjamin Steenkamer
-// CPEG 621, Lab 2 - Calculator Compiler Back End
+// CPEG 621 Lab 2 - Calculator Compiler Back End
 
 #include <stdlib.h> // for atoi call
 #include <string.h>
@@ -13,7 +13,7 @@ void yyerror(char *);	// Defined in calc.y
 
 %%
 
-[a-z][A-Za-z0-9]* {
+[A-Za-z][A-Za-z0-9]* {		// Variable names are case insensitive
 	#ifdef DEBUG
 	printf("token %s at line %d\n", yytext, lineNum);
 	#endif

@@ -1,7 +1,8 @@
 %{
 // Benjamin Steenkamer
-// CPEG 621, Lab 2 - Calculator Compiler Back End
+// CPEG 621 Lab 2 - Calculator Compiler Back End
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -81,13 +82,27 @@ expr :
 
 %%
 
+// Convert a string to lower case
+// Use to this to help enforce variable names being case insensitive
+char* lc(char* str)
+{
+	int i;
+	for (i = 0; i < strlen(str); i++)
+	{
+		str[i] = tolower(str[i]);
+	}
+	return str;
+}
+
 // Called for var_name = value operations
 // Searches the array of vars for var_name; if found, assigns value to it and returns assigned value
 // If var_name doesn't exist, create var_name in array, assign new value, return assigned value
 int var_assignment(char* var_name, int value)
 {
-	// Search vars to see if var_name was already created
+	var_name = lc(var_name);
 	int i = 0;
+	
+	// Search vars to see if var_name was already created
 	for(i = 0; i < num_vars; i++)
 	{
 		if (strcmp(vars[i].name, var_name) == 0)
@@ -113,7 +128,9 @@ int var_assignment(char* var_name, int value)
 // If variable wasn't declared previously, create it with a value of zero
 int get_var_value(char *var_name)
 {
+	var_name = lc(var_name);
 	int i = 0;
+	
 	for(i = 0; i < num_vars; i++)
 	{
 		if (strcmp(vars[i].name, var_name) == 0)
@@ -135,6 +152,7 @@ int get_var_value(char *var_name)
 // Attempts to add a new variable to the vars array
 // Returns index of new variable in array if successful
 // Returns negative number if there was an error
+// var_name will be lower case because of other functions already handling this
 int create_var(char *var_name)
 {
 	if (num_vars >= MAX_NUM_VARS)
@@ -150,10 +168,10 @@ int create_var(char *var_name)
 	}
 
 	strncpy(vars[num_vars].name, var_name, len);
-	vars[num_vars].value = 0;	// Initialize variable with a value of zero
+	vars[num_vars].value = 0;		// Initialize variable with a value of zero
 	num_vars++;
 
-	return num_vars - 1;
+	return num_vars - 1;	// Total number of variables - 1 is the index of this new variable
 }
 
 // Handle to decode errors and print error message
@@ -179,7 +197,7 @@ void yyerror(char *s)
 
 int main()
 {
-	// Initialize variable names and values
+	// Initialize variable names and values as null/zero
 	int i;
 	for (i = 0; i < MAX_NUM_VARS; i++)
 	{
