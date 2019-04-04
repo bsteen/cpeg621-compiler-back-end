@@ -7,9 +7,8 @@
 # Do Task 1
 # 	translate to 3 address code
 # 		Make sure freeing happens
-#		Add unary ! function
 #       Add conditional expression
-# 		Unnecessary temp register for assignment
+# 		Unnecessary temp register for assignment to user variable
 # 	Remove unneeded includes
 # 	check output file for all required features
 

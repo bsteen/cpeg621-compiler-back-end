@@ -11,7 +11,12 @@
 extern int lineNum; 	// line number from cal.tab.c
 extern FILE * yyin;		// Defined in calc.y as the input file
 void yyerror(char *);	// Defined in calc.y
+
+// Options below exclude unused input and yyunput functions
 %}
+
+%option noinput	
+%option nounput 	
 
 %%
 

@@ -62,7 +62,7 @@ calc :
 	;
 
 statement:
-	expr					{ 
+	expr					{
 							  // fprintf(tac_output, "%s;\n", $1);	// Don't need to print single expressions
 							  free($1);								// as they functionally do nothing
 							}
@@ -80,7 +80,7 @@ expr :
 	| expr '-' expr   { $$ = gen_tac_code($1, "-", $3); }
 	| expr '*' expr   { $$ = gen_tac_code($1, "*", $3); }
 	| expr '/' expr   { $$ = gen_tac_code($1, "/", $3); }
-	// | '!' expr		  { $$ = ~$2; }
+	| '!' expr		  { $$ = gen_tac_code(NULL, "!", $2); }
 	| expr POWER expr { $$ = gen_tac_code($1, "**", $3); }
 	| '(' expr ')'    { $$ = $2; }		// Will give syntax error for unmatched parens
 	// | '(' expr ')' '?' '(' expr ')' { $$ = ($2 != 0) ? $6 : 0; }
@@ -99,11 +99,17 @@ char* gen_tac_code(char * one, char * op, char * three)
 	sprintf(tmp_var_name, "_t%d", num_temp_vars);
 	num_temp_vars++;
 	
-	// Write out three address code
-	fprintf(tac_output, "%s = %s %s %s;\n", tmp_var_name, one, op, three);
-	
-	// Free input strings
-	free(one);
+	if (one != NULL)
+	{
+		// Write out three address code
+		fprintf(tac_output, "%s = %s %s %s;\n", tmp_var_name, one, op, three);
+		free(one);
+	}
+	else	// Unary operator case
+	{
+		fprintf(tac_output, "%s = %s%s;\n", tmp_var_name, op, three);
+	}
+
 	free(three);
 	
 	return strdup(tmp_var_name);

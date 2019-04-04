@@ -1,5 +1,13 @@
+1
+1+2
+1+2+3
 B = 3
 A = B + C * 1
 C = (D * 2)
 testVAR = (C + 10) / 2
 Testvar = testvar ** a
+a=1+2+a
+a=1*2+(3-2)/B
+Aaa=BbBbBB
+!a
+a=!(!2*!b**2)
