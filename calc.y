@@ -83,7 +83,7 @@ expr :
 	| '!' expr		  { $$ = gen_tac_code(NULL, "!", $2); }
 	| expr POWER expr { $$ = gen_tac_code($1, "**", $3); }
 	| '(' expr ')'    { $$ = $2; }		// Will give syntax error for unmatched parens
-	// | '(' expr ')' '?' '(' expr ')' { $$ = ($2 != 0) ? $6 : 0; }
+	| '(' expr ')' '?' { /*create if header*/ } '(' expr ')' { }
 	;
 
 %%

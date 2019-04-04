@@ -6,16 +6,21 @@
 
 # Do Task 1
 # 	translate to 3 address code
+#		Add conditional expression
 # 		Make sure freeing happens
-#       Add conditional expression
 # 		Unnecessary temp register for assignment to user variable
 # 	Remove unneeded includes
 # 	check output file for all required features
 
 # Do Task 3
-# ask user inputs for variables
-# print out variable values at the end
-# Add labels
+# 	Keep track of user variables as they are used
+# 	Note if they are used in assignment
+#	Record tac as they are printed (array of strings)
+#	declare all user variables
+#	Gen temp variables with simple loop and num temp vars value
+# 	Initialize variables not assigned (ask user inputs for variables)
+# 	Print out TAC with labels
+# 	print out variable values at the end
 # Read notes
 # Pick Task 2
 
