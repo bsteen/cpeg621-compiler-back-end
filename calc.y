@@ -14,7 +14,7 @@
 int yylex(void);						// Will be generated in lex.yy.c by flex
 
 // Following are defined below in sub-routines section
-void yyerror(char *);					// Following are defined below in sub-routines section
+void yyerror(const char *);				// Following are defined below in sub-routines section
 int var_assignment(char *, int);
 int get_var_value(char *);
 int create_var(char *);
@@ -33,6 +33,7 @@ FILE * yyin;							// Input file pointer
 FILE * output;							// Output file pointer
 %}
 
+%define parse.error verbose		// Enable verbose errors
 %token INTEGER POWER VARIABLE	// bison adds these #defines in calc.tab.h for use in flex
 
 // Union defines all possible values a token can have associated with it
@@ -197,7 +198,7 @@ void print_var_create_error(int error)
 	}
 }
 
-void yyerror(char *s)
+void yyerror(const char *s)
 {
 	printf("%s\n", s);
 }
@@ -214,8 +215,6 @@ int main(int argc, char *argv[])
 	{
 		yyin = fopen(argv[1], "r");
 	}
-	
-	
 	
 	// Initialize variable names and values as null/zero
 	int i;

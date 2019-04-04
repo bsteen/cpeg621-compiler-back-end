@@ -6,7 +6,7 @@
 #include <string.h>
 #include "calc.tab.h"
 
-//#define DEBUG 			// for debugging: print tokens and their line numbers
+// #define DEBUG 			// for debugging: print tokens and their line numbers
 
 extern int lineNum; 	// line number from cal.tab.c
 extern FILE * yyin;		// Defined in calc.y as the input file

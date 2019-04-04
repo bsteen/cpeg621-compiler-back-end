@@ -20,5 +20,9 @@ calc: calc.l calc.y
 	flex calc.l
 	gcc lex.yy.c calc.tab.c -o calc -lm
 	
+# Create calc.output for debugging
+debug:
+	bison -v calc.y
+	
 clean:
-	rm -f calc.tab.* lex.yy.c calc
+	rm -f calc.tab.* lex.yy.c calc.output calc
