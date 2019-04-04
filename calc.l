@@ -29,7 +29,7 @@ void yyerror(char *);	// Defined in calc.y
 	printf("token %s at line %d\n", yytext, lineNum);
 	#endif
 
-	yylval.val = atoi(yytext);
+	yylval.str = strdup(yytext); // Must be freed in bison grammar rules
 	return INTEGER;
 	}
 
