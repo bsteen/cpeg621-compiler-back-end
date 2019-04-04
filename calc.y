@@ -80,9 +80,9 @@ expr :
 	| expr '-' expr   { $$ = gen_tac_code($1, "-", $3); }
 	| expr '*' expr   { $$ = gen_tac_code($1, "*", $3); }
 	| expr '/' expr   { $$ = gen_tac_code($1, "/", $3); }
-	| '!' expr		  { $$ = gen_tac_code(NULL, "!", $2); }
+	| '!' expr		  { $$ = gen_tac_code(NULL, "!", $2); }		// Represents bitwise not in calc language
 	| expr POWER expr { $$ = gen_tac_code($1, "**", $3); }
-	| '(' expr ')'    { $$ = $2; }		// Will give syntax error for unmatched parens
+	| '(' expr ')'    { $$ = $2; }								// Will give syntax error for unmatched parens
 	| '(' expr ')' '?' { /*create if header*/ } '(' expr ')' { }
 	;
 
@@ -107,7 +107,9 @@ char* gen_tac_code(char * one, char * op, char * three)
 	}
 	else	// Unary operator case
 	{
-		fprintf(tac_output, "%s = %s%s;\n", tmp_var_name, op, three);
+		if (strcmp("!", op) == 0)	// Convert ! to ~ for proper C functionality
+			fprintf(tac_output, "%s = ~%s;\n", tmp_var_name, three);
+		}
 	}
 
 	free(three);
