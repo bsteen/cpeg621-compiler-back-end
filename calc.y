@@ -7,19 +7,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_USR_NUM_VARS 30			// Max number of unique user variables allowed
+#define MAX_USR_VAR_NAME_LEN 20 	// How long a user variable name can be
 
 int yylex(void);						// Will be generated in lex.yy.c by flex
 
 // Following are defined below in sub-routines section
 void yyerror(const char *);				// Following are defined below in sub-routines section
-char* lc(char *str);
 char* gen_tac_code(char * one, char * op, char * three);
+void gen_if_start(char * str);
+char* lc(char *str);
+void gen_c_code();
 
-int num_temp_vars = 0;					// Number of temp vars in use
+int num_temp_vars = 0;				// Number of temp vars in use
 
-int lineNum = 1;						// Used for debugging
-FILE * yyin;							// Input file pointer
-FILE * tac_output;						// Three address code output file pointer
+int num_user_vars = 0;				// Number of user variables in use
+int num_user_vars_wo_def = 0;		// Number of user variables that didn't have declarations
+char user_vars[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN];			// List of all unique user vars in proper
+char user_vars_wo_def[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN];	// List of user vars used w/o definition
+
+int lineNum = 1;		// Used for debugging
+FILE * yyin;			// Input calc program file pointer
+FILE * tac_code;		// Three address code file pointer
+FILE * c_code;			// C code produced by backend file pointer
 %}
 
 %define parse.error verbose		// Enable verbose errors
@@ -63,11 +73,11 @@ calc :
 
 statement:
 	expr					{
-							  // fprintf(tac_output, "%s;\n", $1);	// Don't need to print single expressions
+							  // fprintf(tac_code, "%s;\n", $1);	// Don't need to print single expressions
 							  free($1);								// as they functionally do nothing
 							}
 	| VARIABLE '=' expr		{
-							  fprintf(tac_output, "%s = %s;\n", lc($1), $3);
+							  fprintf(tac_code, "%s = %s;\n", lc($1), $3);
 							  free($1);
 							  free($3);
 							}
@@ -83,7 +93,7 @@ expr :
 	| '!' expr		  { $$ = gen_tac_code(NULL, "!", $2); }		// Represents bitwise not in calc language
 	| expr POWER expr { $$ = gen_tac_code($1, "**", $3); }
 	| '(' expr ')'    { $$ = $2; }								// Will give syntax error for unmatched parens
-	| '(' expr ')' '?' { /*create if header*/ } '(' expr ')' { }
+	| '(' expr ')' '?' { gen_if_start($2); } '(' expr ')' { free($2); free($7); }
 	;
 
 %%
@@ -102,19 +112,24 @@ char* gen_tac_code(char * one, char * op, char * three)
 	if (one != NULL)
 	{
 		// Write out three address code
-		fprintf(tac_output, "%s = %s %s %s;\n", tmp_var_name, one, op, three);
+		fprintf(tac_code, "%s = %s %s %s;\n", tmp_var_name, one, op, three);
 		free(one);
 	}
 	else	// Unary operator case
 	{
-		if (strcmp("!", op) == 0)	// Convert ! to ~ for proper C functionality
-			fprintf(tac_output, "%s = ~%s;\n", tmp_var_name, three);
-		}
+		fprintf(tac_code, "%s = %s%s;\n", tmp_var_name, op, three);
 	}
 
 	free(three);
 	
 	return strdup(tmp_var_name);
+}
+
+void gen_if_start(char * str)
+{
+	fprintf(tac_code, "if(%s) {\n", str);
+	// free(str);
+	return;
 }
 
 // Convert a string to lower case
@@ -127,6 +142,72 @@ char* lc(char *str)
 		str[i] = tolower(str[i]);
 	}
 	return str;
+}
+
+// Take the TAC and generate a valid C program code
+void gen_c_code()
+{
+	int i;
+	fprintf(c_code, "#include <stdio.h>\n#include <math.h>\nint main() {\n");
+	
+	// Declare all user variables and initialize them to 0
+	if (num_user_vars_vars > 0)
+	{
+		fprintf(c_code, "\tint ");
+	}
+	for(i = 0; i < num_user_vars; i++)
+	{
+		if (i != num_user_vars - 1)
+		{
+			fprintf("%s, ", user_vars[i]);
+		}
+		else
+		{
+			fprintf(c_code, "%s = 0;\n", user_vars[i]);
+		}
+	}
+	
+	// Declare all temp variables and initialize them to 0
+	if (num_temp_vars > 0)
+	{
+		fprintf(c_code, "\tint ");
+	}
+	for(i = 0; i < num_temp_vars; i++)
+	{
+		if(i != num_temp_vars - 1)
+		{
+			fprintf(c_code, "_t%d, ", i);
+		}
+		else
+		{
+			fprintf(c_code, "%_t%d = 0;\n", i);
+		}
+	}
+	
+	// Initialize user variables not assigned (ask user inputs for variables)
+	for (i = 0; i < num_user_vars_wo_def; i++)
+	{
+		printf("printf(\"%s=\");\n", user_vars_wo_def[i]);
+		printf("scanf(\"%%d\", &%s);\n\n", user_vars_wo_def[i]);
+	}
+	
+	// Read in TAC file, write to c file with labels
+	// Convert lines with ** or ! and replace with pow and ~
+	char input_buf[256];
+	while(fget(input_buf, 256, tac_code) != NULL)
+	{
+		
+	}
+	
+	// Print out user variable final values
+	for(i = 0; i < num_user_vars; i++)
+	{
+		fprintf(c_code, "printf(\"%s=%%d\\n\", %s);\n", user_vars[i], user_vars[i]);
+	}
+	
+	fprintf(c_code, "}\n");
+	
+	return;
 }
 
 void yyerror(const char *s)
@@ -148,14 +229,24 @@ int main(int argc, char *argv[])
 	}
 	
 	// Open the output file where the three address codes will be written
-	tac_output = fopen("frontend-tac.txt", "w");
+	tac_code = fopen("frontend-tac.txt", "w");
 	
 	// Read in the input program
 	yyparse();
 	
-	// Close the files
+	// Close the files from TAC generation
 	fclose(yyin);
-	fclose(tac_output);
+	fclose(tac_code);
+	
+	//Open files for writing C code
+	tac_code = fopen("frontend-tac.txt", "r");
+	c_code = fopen("backend-c.c", "w");
+	
+	gen_c_code();	// Generate C code
+	
+	// Close files from C code generation
+	fclose(tac_code);
+	fclose(c_code);
 	
 	return 0;
 }

@@ -4,6 +4,10 @@
 # TO DO:
 # How does 3 address code go from step 1 to step 2, in what format / program?
 
+# Do Task 3
+# 	Keep track of user variables as they are used
+# 	Note if they are used in assignment
+#	Read in TAC file, write to c file with labels, close file
 # Do Task 1
 # 	translate to 3 address code
 #		Add conditional expression
@@ -11,16 +15,6 @@
 # 		Unnecessary temp register for assignment to user variable
 # 	Remove unneeded includes
 # 	check output file for all required features
-
-# Do Task 3
-# 	Keep track of user variables as they are used
-# 	Note if they are used in assignment
-#	Record tac as they are printed (array of strings)
-#	declare all user variables
-#	Gen temp variables with simple loop and num temp vars value
-# 	Initialize variables not assigned (ask user inputs for variables)
-# 	Print out TAC with labels
-# 	print out variable values at the end
 # Read notes
 # Pick Task 2
 
