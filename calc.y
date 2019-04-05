@@ -148,10 +148,10 @@ char* lc(char *str)
 void gen_c_code()
 {
 	int i;
-	fprintf(c_code, "#include <stdio.h>\n#include <math.h>\nint main() {\n");
+	fprintf(c_code, "#include <stdio.h>\n#include <math.h>\n\nint main() {\n");
 	
 	// Declare all user variables and initialize them to 0
-	if (num_user_vars_vars > 0)
+	if (num_user_vars > 0)
 	{
 		fprintf(c_code, "\tint ");
 	}
@@ -159,7 +159,7 @@ void gen_c_code()
 	{
 		if (i != num_user_vars - 1)
 		{
-			fprintf("%s, ", user_vars[i]);
+			fprintf(c_code, "%s, ", user_vars[i]);
 		}
 		else
 		{
@@ -180,29 +180,68 @@ void gen_c_code()
 		}
 		else
 		{
-			fprintf(c_code, "%_t%d = 0;\n", i);
+			fprintf(c_code, "_t%d = 0;\n\n", i);
 		}
 	}
 	
 	// Initialize user variables not assigned (ask user inputs for variables)
 	for (i = 0; i < num_user_vars_wo_def; i++)
 	{
-		printf("printf(\"%s=\");\n", user_vars_wo_def[i]);
-		printf("scanf(\"%%d\", &%s);\n\n", user_vars_wo_def[i]);
+		fprintf(c_code, "\tprintf(\"%s=\");\n", user_vars_wo_def[i]);
+		fprintf(c_code, "\tscanf(\"%%d\", &%s);\n\n", user_vars_wo_def[i]);
 	}
 	
 	// Read in TAC file, write to c file with labels
 	// Convert lines with ** or ! and replace with pow and ~
-	char input_buf[256];
-	while(fget(input_buf, 256, tac_code) != NULL)
-	{
+	char line_buf[128];
+	char *bitwise;
+	char *pow;
+	i = 0;
+	while(fgets(line_buf, 128, tac_code) != NULL)
+	{	
+		bitwise = strstr(line_buf, "!");
+		pow = strstr(line_buf, "**");
 		
+		if(bitwise != NULL) // Replace ! with ~
+		{
+			*bitwise = '~';
+		}
+		
+		if(pow != NULL)		// Split up the line with a ** and reformat it with a pow() func
+		{
+			char temp[128];
+			strcpy(temp, line_buf);
+			
+			char *first = strtok(temp, " =*;");		// Lines with ** will always have 3 operands
+			char *second = strtok(NULL, " =*;");
+			char *third = strtok(NULL, " =*;");
+	
+			sprintf(line_buf, "%s = (int)pow(%s, %s);\n", first, second, third);
+		}
+		
+		if(strcmp(line_buf, "}\n") == 0)	// Don't print label if line is a closing }
+		{
+			fprintf(c_code, "\t\t%s", line_buf);
+			continue;
+		}
+		
+		// Print c code line with line # label
+		if(i < 10)
+		{
+			fprintf(c_code, "\tS%d:\t\t%s", i, line_buf);
+		}
+		else
+		{
+			fprintf(c_code, "\tS%d:\t%s", i, line_buf);
+		}
+		
+		i++;
 	}
 	
 	// Print out user variable final values
 	for(i = 0; i < num_user_vars; i++)
 	{
-		fprintf(c_code, "printf(\"%s=%%d\\n\", %s);\n", user_vars[i], user_vars[i]);
+		fprintf(c_code, "\tprintf(\"%s=%%d\\n\", %s);\n", user_vars[i], user_vars[i]);
 	}
 	
 	fprintf(c_code, "}\n");
@@ -220,16 +259,26 @@ int main(int argc, char *argv[])
 	// Open the input program file
 	if (argc != 2)
 	{
-		printf("Need to provide input file\n");
+		yyerror("Need to provide input file");
 		exit(1);
 	}
 	else
 	{
 		yyin = fopen(argv[1], "r");
+		if(yyin == NULL)
+		{
+			yyerror("Couldn't open input file");
+			exit(1);
+		}
 	}
 	
 	// Open the output file where the three address codes will be written
 	tac_code = fopen("frontend-tac.txt", "w");
+	if (tac_code == NULL)
+	{
+		yyerror("Couldn't create TAC file");
+		exit(1);
+	}
 	
 	// Read in the input program
 	yyparse();
@@ -238,9 +287,19 @@ int main(int argc, char *argv[])
 	fclose(yyin);
 	fclose(tac_code);
 	
-	//Open files for writing C code
+	// Open files for writing C code
 	tac_code = fopen("frontend-tac.txt", "r");
 	c_code = fopen("backend-c.c", "w");
+	if (tac_code == NULL)
+	{
+		yyerror("Couldn't open TAC file");
+		exit(1);
+	}
+	if (c_code == NULL)
+	{
+		yyerror("Couldn't create C code file");
+		exit(1);
+	}
 	
 	gen_c_code();	// Generate C code
 	

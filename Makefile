@@ -7,14 +7,14 @@
 # Do Task 3
 # 	Keep track of user variables as they are used
 # 	Note if they are used in assignment
-#	Read in TAC file, write to c file with labels, close file
 # Do Task 1
 # 	translate to 3 address code
 #		Add conditional expression
 # 		Make sure freeing happens
 # 		Unnecessary temp register for assignment to user variable
 # 	Remove unneeded includes
-# 	check output file for all required features
+# 	check output files (TAC and C) for all required features
+# 		Make sure } doesn't get a line number
 # Read notes
 # Pick Task 2
 
@@ -23,9 +23,12 @@ calc: calc.l calc.y
 	flex calc.l
 	gcc -Wall lex.yy.c calc.tab.c -o calc
 	
+test: test.c
+	gcc -Wall test.c
+	
 # Create calc.output for debugging
 debug:
 	bison -v calc.y
 	
 clean:
-	rm -f calc.tab.* lex.yy.c calc.output frontend-tac.txt calc
+	rm -f calc.tab.* lex.yy.c calc.output frontend-tac.txt backend-c.c calc a.out
