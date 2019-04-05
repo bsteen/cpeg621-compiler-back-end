@@ -8,9 +8,9 @@
 #include <string.h>
 
 #define MAX_USR_NUM_VARS 30			// Max number of unique user variables allowed
-#define MAX_USR_VAR_NAME_LEN 20 	// How long a user variable name can be
+#define MAX_USR_VAR_NAME_LEN 30 	// How long a user variable name can be (not including \0)
 
-int yylex(void);						// Will be generated in lex.yy.c by flex
+int yylex(void);					// Will be generated in lex.yy.c by flex
 
 // Following are defined below in sub-routines section
 void yyerror(const char *);				// Following are defined below in sub-routines section
@@ -18,13 +18,14 @@ char* gen_tac_code(char * one, char * op, char * three);
 void gen_if_start(char * str);
 char* lc(char *str);
 void gen_c_code();
+void track_user_var(char * var, int assigned);
 
 int num_temp_vars = 0;				// Number of temp vars in use
 
 int num_user_vars = 0;				// Number of user variables in use
 int num_user_vars_wo_def = 0;		// Number of user variables that didn't have declarations
-char user_vars[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN];			// List of all unique user vars in proper
-char user_vars_wo_def[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN];	// List of user vars used w/o definition
+char user_vars[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN + 1];			// List of all unique user vars in proper
+char user_vars_wo_def[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN + 1];	// List of user vars used w/o definition
 
 int lineNum = 1;		// Used for debugging
 FILE * yyin;			// Input calc program file pointer
@@ -77,6 +78,7 @@ statement:
 							  free($1);								// as they functionally do nothing
 							}
 	| VARIABLE '=' expr		{
+							  track_user_var(lc($1), 1);
 							  fprintf(tac_code, "%s = %s;\n", lc($1), $3);
 							  free($1);
 							  free($3);
@@ -85,7 +87,7 @@ statement:
 
 expr :
 	INTEGER			  { $$ = $1; }
-	| VARIABLE        { $$ = lc($1); }
+	| VARIABLE        { $$ = lc($1); track_user_var(lc($1), 0); }
 	| expr '+' expr   { $$ = gen_tac_code($1, "+", $3); }
 	| expr '-' expr   { $$ = gen_tac_code($1, "-", $3); }
 	| expr '*' expr   { $$ = gen_tac_code($1, "*", $3); }
@@ -97,6 +99,18 @@ expr :
 	;
 
 %%
+
+// Convert a string to lower case
+// Use to this to help enforce variable names being case insensitive
+char* lc(char *str)
+{
+	int i;
+	for (i = 0; i < strlen(str); i++)
+	{
+		str[i] = tolower(str[i]);
+	}
+	return str;
+}
 
 // Generates and writes out string of three address code
 // Frees the input strings
@@ -132,16 +146,43 @@ void gen_if_start(char * str)
 	return;
 }
 
-// Convert a string to lower case
-// Use to this to help enforce variable names being case insensitive
-char* lc(char *str)
+// Records all first appearances of user variables for use in C code generation
+// If variable is not being defined and hasn't been used before, add it to list of uninitialized variables
+void track_user_var(char *var, int assigned)
 {
+	// Check if variable has been recorded before
 	int i;
-	for (i = 0; i < strlen(str); i++)
+	for(i = 0; i < num_user_vars; i++)
 	{
-		str[i] = tolower(str[i]);
+		if(strcmp(user_vars[i], var) == 0)
+		{
+			return; // If the variable was already recorded, don't need to record it again
+		}
+	} 
+	
+	// Check if variable is valid
+	if(num_user_vars >= MAX_USR_NUM_VARS)
+	{
+		yyerror("Max number of user variables reached");
+		exit(1);	// Exit since variable (and therefor the entire program) is not valid
 	}
-	return str;
+	else if (strlen(var) > MAX_USR_VAR_NAME_LEN)
+	{
+		yyerror("Variable name too long");
+		exit(1); 	// Exit since variable (and therefor the entire program) is not valid
+	}
+	
+	// If the variable hasn't been seen before, need to record its first appearance
+	if(!assigned)	// If variable is not being assigned a value, then it's first use is without a definition
+	{
+		strcpy(user_vars_wo_def[num_user_vars_wo_def], var);
+		num_user_vars_wo_def++;
+	}
+	
+	strcpy(user_vars[num_user_vars], var);
+	num_user_vars++;
+		
+	return;
 }
 
 // Take the TAC and generate a valid C program code
@@ -238,13 +279,15 @@ void gen_c_code()
 		i++;
 	}
 	
+	fprintf(c_code, "\n");
+	
 	// Print out user variable final values
 	for(i = 0; i < num_user_vars; i++)
 	{
 		fprintf(c_code, "\tprintf(\"%s=%%d\\n\", %s);\n", user_vars[i], user_vars[i]);
 	}
 	
-	fprintf(c_code, "}\n");
+	fprintf(c_code, "\n\treturn 0;\n}\n");
 	
 	return;
 }
