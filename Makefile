@@ -17,9 +17,6 @@ calc: calc.l calc.y
 	flex calc.l
 	gcc -Wall lex.yy.c calc.tab.c -o calc
 	
-test: test.c
-	gcc -Wall test.c
-	
 # Create calc.output for debugging
 debug:
 	bison -v calc.y
