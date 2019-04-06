@@ -50,14 +50,13 @@ FILE * c_code;			// C code produced by backend file pointer
 // In this case, all values associated with tokens are to be strings
 %type <str> INTEGER POWER VARIABLE
 
-// Statements and expressions values are also string type
-%type <str> statement expr
-
+// Conditional expressions and expressions values are also string type
+%type <str> expr 
 
 // Make grammar unambiguous
 // Low to high precedence and associativity within a precedent rank
 // https://en.cppreference.com/w/c/language/operator_precedence
-%precedence '?'
+%right '?'
 %left '+' '-'
 %left '*' '/'
 %precedence '!'		// Unary bitwise not; No associativity b/c it is unary
@@ -75,7 +74,7 @@ calc :
 statement:
 	expr					{
 								// fprintf(tac_code, "%s;\n", $1);	// Don't need to print single expressions
-								free($1);								// as they functionally do nothing
+								free($1);							// as they functionally do nothing
 							}
 	| VARIABLE '=' expr		{
 								track_user_var(lc($1), 1);
@@ -83,20 +82,14 @@ statement:
 								free($1);
 								free($3);
 							}
-	| '(' VARIABLE '=' expr	')'
-							{
-								track_user_var(lc($2), 1);
-								fprintf(tac_code, "%s = %s;\n", lc($2), $4);
-								free($2);
-								free($4);
-							}
 	| '(' expr ')' '?' '(' expr ')'
-							{
-								gen_if_else(NULL, $2, $6);
-								free($2);
-								free($6);
-							}
+					  {
+						gen_if_else($2, $6);
+						free($2);
+						free($6);
+					  }
 	;
+	
 expr :
 	INTEGER			  { $$ = $1; }
 	| VARIABLE        { $$ = lc($1); track_user_var(lc($1), 0); }
@@ -152,8 +145,8 @@ char* gen_tac_code(char * one, char * op, char * three)
 
 void gen_if_else(char * cond_expr, char * expr)
 {
-	fprintf(tac_code, "if(%s) {\n\t%s = %s;\n}\n", cond_expr, dest, expr);
-	fprintf(tac_code, "else {\n\t%s = 0;\n}\n", dest);
+	fprintf(tac_code, "if(%s) {\n", cond_expr);
+	// fprintf(tac_code, "else {\n\t%s = 0;\n}\n", dest);
 	return;
 }
 
