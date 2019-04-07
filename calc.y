@@ -9,9 +9,6 @@
 
 #include "reg_alloc.h"
 
-#define MAX_USR_NUM_VARS 30			// Max number of unique user variables allowed
-#define MAX_USR_VAR_NAME_LEN 30 	// How long a user variable name can be (not including \0)
-
 int yylex(void);					// Will be generated in lex.yy.c by flex
 
 // Following are defined below in sub-routines section
@@ -200,12 +197,12 @@ void gen_c_code(char * input, char * output, int regs)
 	c_code = fopen(output, "w");
 	if (tac_code == NULL)
 	{
-		yyerror("Couldn't open TAC file");
+		yyerror("Couldn't open TAC file in C code generation step");
 		exit(1);
 	}
 	if (c_code == NULL)
 	{
-		yyerror("Couldn't create C code file");
+		yyerror("Couldn't create C code output file");
 		exit(1);
 	}
 	
