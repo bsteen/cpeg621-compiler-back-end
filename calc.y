@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "reg_alloc.h"
+
 #define MAX_USR_NUM_VARS 30			// Max number of unique user variables allowed
 #define MAX_USR_VAR_NAME_LEN 30 	// How long a user variable name can be (not including \0)
 
@@ -143,6 +145,7 @@ char* gen_tac_code(char * one, char * op, char * three)
 	return strdup(tmp_var_name);
 }
 
+// NEED TO COMPLETE
 void gen_if_else(char * cond_expr, char * expr)
 {
 	fprintf(tac_code, "if(%s) {\n", cond_expr);
@@ -190,8 +193,22 @@ void track_user_var(char *var, int assigned)
 }
 
 // Take the TAC and generate a valid C program code
-void gen_c_code()
+void gen_c_code(char * input, char * output, int regs)
 {
+	// Open files for reading TAC and writing C code
+	tac_code = fopen(input, "r");
+	c_code = fopen(output, "w");
+	if (tac_code == NULL)
+	{
+		yyerror("Couldn't open TAC file");
+		exit(1);
+	}
+	if (c_code == NULL)
+	{
+		yyerror("Couldn't create C code file");
+		exit(1);
+	}
+	
 	int i;
 	fprintf(c_code, "#include <stdio.h>\n#include <math.h>\n\nint main() {\n");
 
@@ -225,34 +242,50 @@ void gen_c_code()
 		}
 		else
 		{
-			fprintf(c_code, "_t%d = 0;\n\n", i);
+			fprintf(c_code, "_t%d = 0;\n", i);
 		}
 	}
+	
+	// Create register variables 
+	if(regs)
+	{
+		fprintf(c_code, "\tint _r1, _r2, _r3, _r4 = 0;\n\n");
+	}
+	else
+	{
+		fprintf(c_code, "\n");
+	}
 
-	// Initialize user variables not assigned (ask user inputs for variables)
+	// Initialize user variables not assigned (ask user input for variables)
 	for (i = 0; i < num_user_vars_wo_def; i++)
 	{
 		fprintf(c_code, "\tprintf(\"%s=\");\n", user_vars_wo_def[i]);
 		fprintf(c_code, "\tscanf(\"%%d\", &%s);\n\n", user_vars_wo_def[i]);
 	}
 
-	// Read in TAC file, write to c file with labels
-	// Convert lines with ** or ! and replace with pow and ~
+	// Read in TAC file, write to c file with line labels
+	// Convert lines with ** or ! and replace with pow or ~
 	char line_buf[128];
 	char *bitwise;
 	char *pow;
 	i = 0;
 	while(fgets(line_buf, 128, tac_code) != NULL)
 	{
+		// Don't print label if line is a closing }
+		if(strcmp(line_buf, "}\n") == 0)
+		{
+			fprintf(c_code, "\t\t\t%s", line_buf);
+			continue;
+		}
+		
 		bitwise = strstr(line_buf, "!");
 		pow = strstr(line_buf, "**");
 
-		if(bitwise != NULL) // Replace ! with ~
+		if(bitwise != NULL) 		// Replace ! with ~
 		{
 			*bitwise = '~';
 		}
-
-		if(pow != NULL)		// Split up the line with a ** and reformat it with a pow() func
+		else if(pow != NULL)		// Split up the line with a ** and reformat it with a pow() func
 		{
 			char temp[128];
 			strcpy(temp, line_buf);
@@ -262,12 +295,6 @@ void gen_c_code()
 			char *third = strtok(NULL, " =*;");
 
 			sprintf(line_buf, "%s = (int)pow(%s, %s);\n", first, second, third);
-		}
-
-		if(strcmp(line_buf, "}\n") == 0)	// Don't print label if line is a closing }
-		{
-			fprintf(c_code, "\t\t\t%s", line_buf);
-			continue;
 		}
 
 		// Print c code line with line # label
@@ -280,7 +307,7 @@ void gen_c_code()
 			fprintf(c_code, "\tS%d:\t%s", i, line_buf);
 		}
 
-		i++;
+		i++;	// Increment line number
 	}
 
 	fprintf(c_code, "\n");
@@ -292,6 +319,10 @@ void gen_c_code()
 	}
 
 	fprintf(c_code, "\n\treturn 0;\n}\n");
+	
+	// Close files from C code generation
+	fclose(tac_code);
+	fclose(c_code);
 
 	return;
 }
@@ -327,32 +358,16 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	// Read in the input program
-	yyparse();
+	yyparse();	// Read in the input program and parse the tokens
 
-	// Close the files from TAC generation
+	// Close the files from initial TAC generation
 	fclose(yyin);
 	fclose(tac_code);
+	
+	allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers
 
-	// Open files for writing C code
-	tac_code = fopen("frontend-tac.txt", "r");
-	c_code = fopen("backend-c.c", "w");
-	if (tac_code == NULL)
-	{
-		yyerror("Couldn't open TAC file");
-		exit(1);
-	}
-	if (c_code == NULL)
-	{
-		yyerror("Couldn't create C code file");
-		exit(1);
-	}
-
-	gen_c_code();	// Generate C code
-
-	// Close files from C code generation
-	fclose(tac_code);
-	fclose(c_code);
+	gen_c_code("frontend-tac.txt", "backend-c.c", 0);		// Generate C code from initial TAC
+	// gen_c_code("reg-alloc-tac.txt", "backend-reg-c.c", 1); // Generate C code from register alloc TAC
 
 	return 0;
 }

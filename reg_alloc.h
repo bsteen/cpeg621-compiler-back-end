@@ -1,0 +1,1 @@
+void allocate_registers(char* file_name);
