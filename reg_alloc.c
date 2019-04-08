@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct node {
+typedef struct node
+{
 	char var_name[MAX_USR_VAR_NAME_LEN];
 	
 	int num_live_periods;					// Number of liveness start/end periods
@@ -14,7 +15,7 @@ typedef struct node {
 	int neighbors[MAX_TOTAL_VARS];
 } Node;
 
-Node node_list[MAX_TOTAL_VARS];
+Node node_graph[MAX_TOTAL_VARS];
 int num_nodes = 0;
 
 // Print out all nodes and their values
@@ -24,7 +25,7 @@ void print_nodes()
 	int i, j;
 	for(i = 0; i < num_nodes; i++)
 	{
-		Node temp = node_list[i];
+		Node temp = node_graph[i];
 		printf("%s: ", temp.var_name);
 		
 		for (j = 0; j < temp.num_live_periods; j++)
@@ -35,7 +36,7 @@ void print_nodes()
 		printf("[");
 		for(j = 0; j < temp.num_neighbors; j++)
 		{
-			printf("%s ", node_list[temp.neighbors[j]].var_name);
+			printf("%s ", node_graph[temp.neighbors[j]].var_name);
 		}
 		printf("]\n");
 	}
@@ -43,14 +44,14 @@ void print_nodes()
 	return;
 }
 
-// Find variable's node index in node_list
+// Find variable's node index in node_graph
 // Return -1 if variable node not found
 int get_node_index(char * var_name)
 {
 	int i = 0;
 	for(i = 0; i < num_nodes; i++)
 	{
-		if(strcmp(node_list[i].var_name, var_name) == 0)
+		if(strcmp(node_graph[i].var_name, var_name) == 0)
 		{
 			return i;
 		}
@@ -81,12 +82,12 @@ void create_node(char * var_name, int line_num, int assigned)
 		}
 		
 		// Initialize node values
-		strcpy(node_list[num_nodes].var_name, var_name);
+		strcpy(node_graph[num_nodes].var_name, var_name);
 		
-		node_list[num_nodes].live_starts[0] = line_num;
-		node_list[num_nodes].live_ends[0] = line_num;
-		node_list[num_nodes].num_live_periods = 1;
-		node_list[num_nodes].num_neighbors = 0;
+		node_graph[num_nodes].live_starts[0] = line_num + 1;
+		node_graph[num_nodes].live_ends[0] = line_num + 1;
+		node_graph[num_nodes].num_live_periods = 1;
+		node_graph[num_nodes].num_neighbors = 0;
 		
 		num_nodes++;
 	}
@@ -94,15 +95,19 @@ void create_node(char * var_name, int line_num, int assigned)
 	{
 		if (assigned)	// If variable is being assigned new a value, start new liveness period
 		{	
-			int n = node_list[index].num_live_periods;
-			node_list[index].live_starts[n] = line_num;
-			node_list[index].live_ends[n] = line_num;
-			node_list[index].num_live_periods++;
+			int n = node_graph[index].num_live_periods;
+			node_graph[index].live_starts[n] = line_num + 1;
+			node_graph[index].live_ends[n] = line_num + 1;
+			node_graph[index].num_live_periods++;
 		}
-		else
+		else	// If not being assigned, update end period time if new value occurs later
 		{
-			int n = node_list[index].num_live_periods - 1;
-			node_list[index].live_ends[n] = line_num;
+			int n = node_graph[index].num_live_periods - 1;
+			
+			if(line_num > node_graph[index].live_ends[n])
+			{
+				node_graph[index].live_ends[n] = line_num;
+			}
 		}
 	}
 	
@@ -142,9 +147,9 @@ void initialize_nodes(char* file_name)
 // Determines if two nodes interfere (liveness periods overlap)
 int does_interfere(int node_idx1, int node_idx2)
 {
-	Node node1 = node_list[node_idx1];
-	Node node2 = node_list[node_idx2];
-	int i, j=0;
+	Node node1 = node_graph[node_idx1];
+	Node node2 = node_graph[node_idx2];
+	int i, j = 0;
 	
 	for(i = 0; i < node1.num_live_periods; i++)	// Iterate over node 1's liveness periods
 	{
@@ -175,9 +180,9 @@ void find_neighbors()
 		{
 			if(i != j && does_interfere(i, j))	// Ignore self and check interference with other nodes
 			{
-				int n = node_list[i].num_neighbors;
-				node_list[i].neighbors[n] = j;	// Mark node j as a neighbor to i
-				node_list[i].num_neighbors++;
+				int n = node_graph[i].num_neighbors;
+				node_graph[i].neighbors[n] = j;	// Add node j to node i's neighbor list
+				node_graph[i].num_neighbors++;
 			}
 		}
 	}
@@ -187,12 +192,13 @@ void find_neighbors()
 
 void allocate_registers(char* file_name)
 {
-	
 	// First two functions create the RIG
 	initialize_nodes(file_name);
 	find_neighbors();
 	
-	print_nodes();
+	// print_nodes();
+	
+	// Forward pass
 	
 	return;
 }

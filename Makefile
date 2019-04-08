@@ -3,8 +3,6 @@
 
 # TO DO:
 # Task 2: Reg alloc
-# 	Fix unnecessary liveness overload
-# 	Build RIG
 #	Profitable algo
 # 	Create forward pass
 # 	Create reverse pass
@@ -16,7 +14,8 @@
 # 	check output files (TAC and C) for all required features
 # 		Make sure } doesn't get a line number
 # 	Make sure freeing happens
-# 	Unnecessary temp register for assignment to user variable? (will have to change reg alloc liveness)
+# 	Unnecessary temp register for assignment to user variable?
+#		Check reg alloc liveness
 # Lab report
 
 calc: calc.l calc.y reg_alloc.c reg_alloc.h
