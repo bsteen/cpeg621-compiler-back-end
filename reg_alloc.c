@@ -1,4 +1,5 @@
 #include "reg_alloc.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,7 @@ typedef struct node
 {
 	char var_name[MAX_USR_VAR_NAME_LEN];
 	
-	int reg;								// Register variable is assigned to
+	int assigned_reg;								// Register variable is assigned to
 	int reg_tag;							// no spill, may spill
 	int profit;								// The profitability of a variable
 
@@ -58,7 +59,14 @@ void print_node_stack()
 	int i;
 	for(i = stack_ptr - 1; i >= 0; i--)
 	{
-		printf("%s %d\n", node_stack[i].var_name, node_stack[i].reg_tag);
+		if (node_stack[i].reg_tag == NO_SPILL)
+		{
+			printf("%s\t(%s)\n", node_stack[i].var_name, "NO_SPILL");
+		}
+		else
+		{
+			printf("%s\t(%s)\n", node_stack[i].var_name, "MAY_SPILL");
+		}
 	}
 }
 
@@ -102,6 +110,7 @@ void create_node(char * var_name, int line_num, int assigned)
 
 		// Initialize node values
 		strcpy(node_graph[num_nodes].var_name, var_name);
+		node_graph[num_nodes].assigned_reg = -1;
 		node_graph[num_nodes].profit = 1;
 		node_graph[num_nodes].live_starts[0] = line_num + 1;
 		node_graph[num_nodes].live_ends[0] = line_num + 1;
@@ -190,7 +199,7 @@ int does_interfere(int node_idx1, int node_idx2)
 // Finish the register interference graph by marking edges between each variable
 // node that interfere with each other
 // Interference is when two variables are alive at the same time
-void find_neighbors()
+void find_all_neighbors()
 {
 	int i;	// Index of node currently being looked at
 	int j;	// Index of potential neighbor node to i
@@ -242,10 +251,41 @@ void remove_and_push(int node_idx, int node_tag)
 	// Push node to stack with tag
 	node_stack[stack_ptr] = node_graph[node_idx];
 	node_stack[stack_ptr].reg_tag = node_tag;
+	node_stack[stack_ptr].num_neighbors = 0;			// Clear pushed node's neighbor values
+	
 	stack_ptr++;
-	node_graph[node_idx].var_name[0] = '\0'; // "Remove" node from graph by making name blank
+	node_graph[node_idx].var_name[0] = '\0'; 			// "Remove" node from graph by making name blank
 	
 	return;
+}
+
+// Select register for node that hasn't already been assigned to one of it's neighbors
+// Returns 1 if it was able to find register to assign, 0 if not
+int select_register(int node_idx)
+{
+	int taken_regs[NUM_REG];
+	memset(taken_regs, 0, NUM_REG);
+	
+	int i;
+	for(i = 0; i < node_graph[node_idx].num_neighbors; i++)
+	{
+		int neighbor_idx = node_graph[node_idx].neighbors[i];
+		if(node_graph[neighbor_idx].assigned_reg != -1)
+		{
+			taken_regs[node_graph[neighbor_idx].assigned_reg] = 1;
+		}
+	}
+	
+	for(i = 0; i < NUM_REG; i++)
+	{
+		if(taken_regs[i] == 0)
+		{
+			node_graph[node_idx].assigned_reg = i + 1;	// Register are r1, r2, ...
+			return 1;
+		}
+	}
+	
+	return 0;
 }
 
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
@@ -253,7 +293,7 @@ void allocate_registers(char* file_name)
 {
 	// First two functions create the RIG
 	initialize_nodes(file_name);
-	find_neighbors();
+	find_all_neighbors();
 
 	print_node_graph();
 
@@ -278,10 +318,59 @@ void allocate_registers(char* file_name)
 				}
 			}
 		}
-
+		
+		if(nodes_left > 0)
+		{
+			int least_profit = INT_MAX;
+			int i, least_prof_idx;
+			
+			for(i = 0; i < num_nodes; i++)
+			{
+				// Find variable that is least profitable
+				if(strcmp(node_graph[i].var_name, "") != 0 && node_graph[i].profit < least_profit)
+				{
+					least_prof_idx = i;
+					least_profit = node_graph[i].profit;
+				}
+			}
+			
+			remove_and_push(least_prof_idx, MAY_SPILL);
+			nodes_left--;
+		}
 	}
 	
 	print_node_stack();
 
+	// Reverse pass
+	int i;
+	int j = 0;
+	for(i = stack_ptr - 1; i >= 0; i--)
+	{	// Put all values from stack back into graph array (top is left most, bottom is right most)
+		node_graph[j] = node_stack[i];
+		j++;
+	}
+	
+	// TO DO: Replace with BACKUP neighbor list instead
+	find_all_neighbors();		// Rebuild neighbor list
+	
+	for(i = 0; i < num_nodes; i++)
+	{
+		if(node_graph[i].reg_tag == NO_SPILL)
+		{
+			select_register(i);
+		}
+		else
+		{
+			int succeeded = select_register(i);
+			if(!succeeded)
+			{
+				node_graph[i].assigned_reg = -1;
+			}
+		}
+	}
+	
+	// Create output TAC with register assignment inserted
+	// TO DO
+	
 	return;
 }

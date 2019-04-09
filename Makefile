@@ -6,7 +6,11 @@
 # 	Create forward pass
 #		Verify remove and push
 # 	Create reverse pass
+#		Create backups of neigbors instead
+# 		Verify reverse pass
+# 	Check select reg function
 #	Profitable algo?
+#	Output register assignment TAC
 #	Spill all registers at end
 # 	Print out final reg alloc TAC (reg-alloc-tac.txt)
 # Do Task 1
