@@ -8,7 +8,7 @@ typedef struct node
 {
 	char var_name[MAX_USR_VAR_NAME_LEN];
 	
-	int assigned_reg;								// Register variable is assigned to
+	int assigned_reg;						// Register variable is assigned to
 	int reg_tag;							// no spill, may spill
 	int profit;								// The profitability of a variable
 
@@ -30,19 +30,19 @@ Node node_stack[MAX_TOTAL_VARS];
 // Print out all nodes in RIG and their values
 void print_node_graph()
 {
-	printf("RIG: Var name (profit) [live start, live end] ... [Neighbors]\n");
+	printf("RIG: Var_name register profit [live start, live end] ... [Neighbors]\n");
 	int i, j;
 	for(i = 0; i < num_nodes; i++)
 	{
 		Node temp = node_graph[i];
-		printf("%s (%d): ", temp.var_name, temp.profit);
+		printf("%s r=%d p=%d l=", temp.var_name, temp.assigned_reg, temp.profit);
 
 		for (j = 0; j < temp.num_live_periods; j++)
 		{
 			printf("[%d, %d] ", temp.live_starts[j], temp.live_ends[j]);
 		}
 
-		printf("[");
+		printf("n=[");
 		for(j = 0; j < temp.num_neighbors; j++)
 		{
 			printf("%s ", node_graph[temp.neighbors[j]].var_name);
@@ -70,6 +70,8 @@ void print_node_stack()
 			printf("%s\t%s\n", node_stack[i].var_name, "MAY_SPILL");
 		}
 	}
+	
+	printf("\n");
 }
 
 // Helper function used by create_node
@@ -291,18 +293,34 @@ int select_register(int node_idx)
 }
 
 // Create the TAC with register assignment
-void gen_reg_tac()
+void gen_reg_tac(char * input_tac_file_name)
 {
-	FILE * tac_code = fopen("reg-alloc-tac.txt","w");
-	if(tac_code == NULL)
+	FILE * ouput_tac_code = fopen("reg-alloc-tac.txt","w");
+	if(ouput_tac_code == NULL)
 	{
-		printf("Can't create TAC output file in register allocation stage");
+		printf("Can't create output TAC file in register allocation stage");
 		exit(1);
 	}
 	
+	FILE * input_tac_code = fopen(input_tac_file_name,"r");
+	if(input_tac_code == NULL)
+	{
+		printf("Can't open input TAC file in register allocation stage");
+		exit(1);
+	}
+	
+	char line[128];
+	int line_num = 1;
+	while(fgets(line, 128, input_tac_code) != NULL)
+	{
+		// At most 3 tokens per TAC line
+		strtok(line, " +-*/!=;")
+		strtok(NULL, " +-*/!=;")
+		strtok(NULL, " +-*/!=;")
+	}
 	
 	
-	fclose(tac_code);
+	fclose(ouput_tac_code);
 	
 	return;
 }
@@ -388,8 +406,10 @@ void allocate_registers(char* front_tac_file_name)
 		}
 	}
 	
+	print_node_graph();
+	
 	// Create output TAC with register assignment inserted
-	gen_reg_tac();
+	gen_reg_tac(front_tac_file_name);
 	
 	return;
 }
