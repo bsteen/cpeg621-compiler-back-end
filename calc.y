@@ -400,10 +400,10 @@ int main(int argc, char *argv[])
 	fclose(yyin);
 	fclose(tac_file);
 
-	// allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers
+	allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers
 
 	gen_c_code("frontend-tac.txt", "backend-c.c", 0);		// Generate C code from initial TAC
-	// gen_c_code("reg-alloc-tac.txt", "backend-reg-c.c", 1); // Generate C code from register alloc TAC
+	gen_c_code("reg-alloc-tac.txt", "backend-reg-c.c", 1); 	// Generate C code from register alloc TAC
 
 	return 0;
 }

@@ -30,6 +30,7 @@ Node node_stack[MAX_TOTAL_VARS];
 // Print out all nodes in RIG and their values
 void print_node_graph()
 {
+	printf("RIG: Var name (profit) [live start, live end] ... [Neighbors]\n");
 	int i, j;
 	for(i = 0; i < num_nodes; i++)
 	{
@@ -56,16 +57,17 @@ void print_node_graph()
 // Print out all nodes in node stack
 void print_node_stack()
 {
+	printf("\nNode stack: Var name\tregister spill label\n");
 	int i;
 	for(i = stack_ptr - 1; i >= 0; i--)
 	{
 		if (node_stack[i].reg_tag == NO_SPILL)
 		{
-			printf("%s\t(%s)\n", node_stack[i].var_name, "NO_SPILL");
+			printf("%s\t%s\n", node_stack[i].var_name, "NO_SPILL");
 		}
 		else
 		{
-			printf("%s\t(%s)\n", node_stack[i].var_name, "MAY_SPILL");
+			printf("%s\t%s\n", node_stack[i].var_name, "MAY_SPILL");
 		}
 	}
 }
@@ -144,14 +146,14 @@ void create_node(char * var_name, int line_num, int assigned)
 	return;
 }
 
-// Read in the TAC file and find each variable
+// Read in the frontend TAC file and find each variable
 // Initialize the node for each variable
 void initialize_nodes(char* file_name)
 {
 	FILE * tac_code = fopen(file_name, "r");
 	if(tac_code == NULL)
 	{
-		printf("Can't open TAC file in register allocation stage\n");
+		printf("Can't open frontend TAC file in register allocation stage\n");
 		exit(1);
 	}
 
@@ -288,11 +290,28 @@ int select_register(int node_idx)
 	return 0;
 }
 
+// Create the TAC with register assignment
+void gen_reg_tac()
+{
+	FILE * tac_code = fopen("reg-alloc-tac.txt","w");
+	if(tac_code == NULL)
+	{
+		printf("Can't create TAC output file in register allocation stage");
+		exit(1);
+	}
+	
+	
+	
+	fclose(tac_code);
+	
+	return;
+}
+
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
-void allocate_registers(char* file_name)
+void allocate_registers(char* front_tac_file_name)
 {
 	// First two functions create the RIG
-	initialize_nodes(file_name);
+	initialize_nodes(front_tac_file_name);
 	find_all_neighbors();
 
 	print_node_graph();
@@ -370,7 +389,7 @@ void allocate_registers(char* file_name)
 	}
 	
 	// Create output TAC with register assignment inserted
-	// TO DO
+	gen_reg_tac();
 	
 	return;
 }

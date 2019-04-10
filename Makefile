@@ -2,8 +2,6 @@
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
 # TO DO:
-# Add conditional expressions in
-# 	C output
 # Task 2: Reg alloc
 # 	Create forward pass
 #		Verify remove and push
@@ -16,7 +14,7 @@
 #	Spill all registers at end
 # 	Print out final reg alloc TAC (reg-alloc-tac.txt)
 # Task 1 + 3
-# 	Edit reg alloc to work with if/else including reg alloc TAC ouput file
+# 	Edit reg alloc to work with if/else including reg alloc TAC output file
 # Other To Do:
 # 	check output files (TAC and C) for all required features
 # 	Make sure } doesn't get a line number
@@ -36,4 +34,5 @@ debug:
 	bison -v calc.y
 
 clean:
-	rm -f calc.tab.* lex.yy.c calc.output frontend-tac.txt backend-c.c calc a.out
+	rm -f calc.tab.* lex.yy.c calc.output calc a.out
+	rm -f frontend-tac.txt reg-alloc-tac.txt backend-c.c backend-reg-c.c
