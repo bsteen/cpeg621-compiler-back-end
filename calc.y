@@ -12,15 +12,18 @@
 int yylex(void);					// Will be generated in lex.yy.c by flex
 
 // Following are defined below in sub-routines section
-void yyerror(const char *);				// Following are defined below in sub-routines section
-char* gen_tac_code(char * one, char * op, char * three);
-void gen_if_else(char * cond_expr, char * expr);
+void my_free(char * ptr);
 char* lc(char *str);
-void gen_c_code();
+char* gen_tac(char * one, char * op, char * three);
+void gen_if(char * cond_expr);
+void gen_else(char * expr);
+void close_if();
 void track_user_var(char * var, int assigned);
+void gen_c_code();
+void yyerror(const char *);
 
+int do_gen_else = 0;				// When set do the else part of the if/else statement
 int num_temp_vars = 0;				// Number of temp vars in use
-
 int num_user_vars = 0;				// Number of user variables in use
 int num_user_vars_wo_def = 0;		// Number of user variables that didn't have declarations
 char user_vars[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN + 1];			// List of all unique user vars in proper
@@ -28,8 +31,8 @@ char user_vars_wo_def[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN + 1];	// List of us
 
 int lineNum = 1;		// Used for debugging
 FILE * yyin;			// Input calc program file pointer
-FILE * tac_code;		// Three address code file pointer
-FILE * c_code;			// C code produced by backend file pointer
+FILE * tac_file;				// Three address code file pointer
+FILE * c_code_file;			// C code produced by backend file pointer
 %}
 
 %define parse.error verbose		// Enable verbose errors
@@ -50,11 +53,12 @@ FILE * c_code;			// C code produced by backend file pointer
 %type <str> INTEGER POWER VARIABLE
 
 // Conditional expressions and expressions values are also string type
-%type <str> expr 
+%type <str> expr
 
 // Make grammar unambiguous
 // Low to high precedence and associativity within a precedent rank
 // https://en.cppreference.com/w/c/language/operator_precedence
+%right '='
 %right '?'
 %left '+' '-'
 %left '*' '/'
@@ -66,42 +70,54 @@ FILE * c_code;			// C code produced by backend file pointer
 %%
 
 calc :
-	calc statement '\n'
+	calc expr '\n'		{ my_free($2); close_if(); }
 	|
 	;
 
-statement:
-	expr					{
-								// fprintf(tac_code, "%s;\n", $1);	// Don't need to print single expressions
-								free($1);							// as they functionally do nothing
-							}
-	| VARIABLE '=' expr		{
-								track_user_var(lc($1), 1);
-								fprintf(tac_code, "%s = %s;\n", lc($1), $3);
-								free($1);
-								free($3);
-							}
-	| '(' expr ')' '?' '(' expr ')'
-					  {
-						gen_if_else($2, $6);
-						free($2);
-						free($6);
-					  }
-	;
-	
 expr :
-	INTEGER			  { $$ = $1; }
-	| VARIABLE        { $$ = lc($1); track_user_var(lc($1), 0); }
-	| expr '+' expr   { $$ = gen_tac_code($1, "+", $3); }
-	| expr '-' expr   { $$ = gen_tac_code($1, "-", $3); }
-	| expr '*' expr   { $$ = gen_tac_code($1, "*", $3); }
-	| expr '/' expr   { $$ = gen_tac_code($1, "/", $3); }
-	| '!' expr		  { $$ = gen_tac_code(NULL, "!", $2); }		// Represents bitwise not in calc language
-	| expr POWER expr { $$ = gen_tac_code($1, "**", $3); }
-	| '(' expr ')'    { $$ = $2; }								// Will give syntax error for unmatched parens
+	INTEGER				{ $$ = $1; }
+	| VARIABLE        	{ $$ = lc($1); track_user_var(lc($1), 0); }
+	| VARIABLE '=' expr
+						{
+							$$ = $1;
+							track_user_var(lc($1), 1);
+							fprintf(tac_file, "%s = %s;\n", lc($1), $3);
+							gen_else($1);
+							my_free($3);
+						}
+	| expr '+' expr		{ $$ = gen_tac($1, "+", $3); my_free($1); my_free($3); }
+	| expr '-' expr		{ $$ = gen_tac($1, "-", $3); my_free($1); my_free($3); }
+	| expr '*' expr		{ $$ = gen_tac($1, "*", $3); my_free($1); my_free($3); }
+	| expr '/' expr		{ $$ = gen_tac($1, "/", $3); my_free($1); my_free($3); }
+	| '!' expr			{ $$ = gen_tac(NULL, "!", $2); my_free($2); }		// Bitwise not in calc lang
+	| expr POWER expr	{ $$ = gen_tac($1, "**", $3); my_free($1); my_free($3);}
+	| '(' expr ')'		{ $$ = $2; }					// Will give syntax error for unmatched parens
+	| '(' expr ')' '?' { gen_if($2); } '(' expr ')'
+						{
+							$$ = $7;
+							do_gen_else++;	// Setting this will either create else with assignment of
+							my_free($2);	// zero or just close if statement if there is no assignment
+						}
 	;
 
 %%
+
+// Used for debugging
+// Print out token being freed
+void my_free(char * ptr)
+{
+	if(ptr == NULL)
+	{
+		yyerror("Tried to free null pointer!");
+	}
+	else
+	{
+		// printf("Freed token: %s\n", ptr);
+		free(ptr);
+	}
+
+	return;
+}
 
 // Convert a string to lower case
 // Use to this to help enforce variable names being case insensitive
@@ -116,9 +132,8 @@ char* lc(char *str)
 }
 
 // Generates and writes out string of three address code
-// Frees the input strings
 // Returns temporary variable's name (that must be freed later)
-char* gen_tac_code(char * one, char * op, char * three)
+char* gen_tac(char * one, char * op, char * three)
 {
 	char tmp_var_name[13]; 	// temp var names: _t0123456789
 
@@ -129,24 +144,48 @@ char* gen_tac_code(char * one, char * op, char * three)
 	if (one != NULL)
 	{
 		// Write out three address code
-		fprintf(tac_code, "%s = %s %s %s;\n", tmp_var_name, one, op, three);
-		free(one);
+		fprintf(tac_file, "%s = %s %s %s;\n", tmp_var_name, one, op, three);
+
 	}
 	else	// Unary operator case
 	{
-		fprintf(tac_code, "%s = %s%s;\n", tmp_var_name, op, three);
+		fprintf(tac_file, "%s = %s%s;\n", tmp_var_name, op, three);
 	}
-
-	free(three);
 
 	return strdup(tmp_var_name);
 }
 
-// NEED TO COMPLETE
-void gen_if_else(char * cond_expr, char * expr)
+// Print out the if part of the if/else statement
+void gen_if(char * cond_expr)
 {
-	fprintf(tac_code, "if(%s) {\n", cond_expr);
-	// fprintf(tac_code, "else {\n\t%s = 0;\n}\n", dest);
+	fprintf(tac_file, "if(%s) {\n", cond_expr);
+	return;
+}
+
+// Print out closing brace of if statement and the whole else statement
+// else will always be a variable being assigned to a value of zero
+void gen_else(char * expr)
+{
+	for (; do_gen_else > 0; do_gen_else--)
+	{
+		fprintf(tac_file, "}\nelse {\n");
+		fprintf(tac_file, "%s = 0;\n", expr);
+		fprintf(tac_file, "}\n");
+	}
+
+	return;
+}
+
+// If the result of the conditional expression is not being written to a variable
+// the else part won't be printed, but the if statement's closing bracket still needs
+// to be printed
+void close_if()
+{
+	for (; do_gen_else > 0; do_gen_else--)
+	{
+		fprintf(tac_file, "}\n");
+	}
+
 	return;
 }
 
@@ -193,71 +232,71 @@ void track_user_var(char *var, int assigned)
 void gen_c_code(char * input, char * output, int regs)
 {
 	// Open files for reading TAC and writing C code
-	tac_code = fopen(input, "r");
-	c_code = fopen(output, "w");
-	if (tac_code == NULL)
+	tac_file = fopen(input, "r");
+	c_code_file = fopen(output, "w");
+	if (tac_file == NULL)
 	{
 		yyerror("Couldn't open TAC file in C code generation step");
 		exit(1);
 	}
-	if (c_code == NULL)
+	if (c_code_file == NULL)
 	{
 		yyerror("Couldn't create C code output file");
 		exit(1);
 	}
-	
+
 	int i;
-	fprintf(c_code, "#include <stdio.h>\n#include <math.h>\n\nint main() {\n");
+	fprintf(c_code_file, "#include <stdio.h>\n#include <math.h>\n\nint main() {\n");
 
 	// Declare all user variables and initialize them to 0
 	if (num_user_vars > 0)
 	{
-		fprintf(c_code, "\tint ");
+		fprintf(c_code_file, "\tint ");
 	}
 	for(i = 0; i < num_user_vars; i++)
 	{
 		if (i != num_user_vars - 1)
 		{
-			fprintf(c_code, "%s, ", user_vars[i]);
+			fprintf(c_code_file, "%s, ", user_vars[i]);
 		}
 		else
 		{
-			fprintf(c_code, "%s = 0;\n", user_vars[i]);
+			fprintf(c_code_file, "%s = 0;\n", user_vars[i]);
 		}
 	}
 
 	// Declare all temp variables and initialize them to 0
 	if (num_temp_vars > 0)
 	{
-		fprintf(c_code, "\tint ");
+		fprintf(c_code_file, "\tint ");
 	}
 	for(i = 0; i < num_temp_vars; i++)
 	{
 		if(i != num_temp_vars - 1)
 		{
-			fprintf(c_code, "_t%d, ", i);
+			fprintf(c_code_file, "_t%d, ", i);
 		}
 		else
 		{
-			fprintf(c_code, "_t%d = 0;\n", i);
+			fprintf(c_code_file, "_t%d = 0;\n", i);
 		}
 	}
-	
-	// Create register variables 
+
+	// Create register variables
 	if(regs)
 	{
-		fprintf(c_code, "\tint _r1, _r2, _r3, _r4 = 0;\n\n");
+		fprintf(c_code_file, "\tint _r1, _r2, _r3, _r4 = 0;\n\n");
 	}
 	else
 	{
-		fprintf(c_code, "\n");
+		fprintf(c_code_file, "\n");
 	}
 
 	// Initialize user variables not assigned (ask user input for variables)
 	for (i = 0; i < num_user_vars_wo_def; i++)
 	{
-		fprintf(c_code, "\tprintf(\"%s=\");\n", user_vars_wo_def[i]);
-		fprintf(c_code, "\tscanf(\"%%d\", &%s);\n\n", user_vars_wo_def[i]);
+		fprintf(c_code_file, "\tprintf(\"%s=\");\n", user_vars_wo_def[i]);
+		fprintf(c_code_file, "\tscanf(\"%%d\", &%s);\n\n", user_vars_wo_def[i]);
 	}
 
 	// Read in TAC file, write to c file with line labels
@@ -266,15 +305,15 @@ void gen_c_code(char * input, char * output, int regs)
 	char *bitwise;
 	char *pow;
 	i = 0;
-	while(fgets(line_buf, 128, tac_code) != NULL)
+	while(fgets(line_buf, 128, tac_file) != NULL)
 	{
 		// Don't print label if line is a closing }
 		if(strcmp(line_buf, "}\n") == 0)
 		{
-			fprintf(c_code, "\t\t\t%s", line_buf);
+			fprintf(c_code_file, "\t\t\t%s", line_buf);
 			continue;
 		}
-		
+
 		bitwise = strstr(line_buf, "!");
 		pow = strstr(line_buf, "**");
 
@@ -297,29 +336,29 @@ void gen_c_code(char * input, char * output, int regs)
 		// Print c code line with line # label
 		if(i < 10)
 		{
-			fprintf(c_code, "\tS%d:\t\t%s", i, line_buf);
+			fprintf(c_code_file, "\tS%d:\t\t%s", i, line_buf);
 		}
 		else
 		{
-			fprintf(c_code, "\tS%d:\t%s", i, line_buf);
+			fprintf(c_code_file, "\tS%d:\t%s", i, line_buf);
 		}
 
 		i++;	// Increment line number
 	}
 
-	fprintf(c_code, "\n");
+	fprintf(c_code_file, "\n");
 
 	// Print out user variable final values
 	for(i = 0; i < num_user_vars; i++)
 	{
-		fprintf(c_code, "\tprintf(\"%s=%%d\\n\", %s);\n", user_vars[i], user_vars[i]);
+		fprintf(c_code_file, "\tprintf(\"%s=%%d\\n\", %s);\n", user_vars[i], user_vars[i]);
 	}
 
-	fprintf(c_code, "\n\treturn 0;\n}\n");
-	
+	fprintf(c_code_file, "\n\treturn 0;\n}\n");
+
 	// Close files from C code generation
-	fclose(tac_code);
-	fclose(c_code);
+	fclose(tac_file);
+	fclose(c_code_file);
 
 	return;
 }
@@ -348,8 +387,8 @@ int main(int argc, char *argv[])
 	}
 
 	// Open the output file where the three address codes will be written
-	tac_code = fopen("frontend-tac.txt", "w");
-	if (tac_code == NULL)
+	tac_file = fopen("frontend-tac.txt", "w");
+	if (tac_file == NULL)
 	{
 		yyerror("Couldn't create TAC file");
 		exit(1);
@@ -359,9 +398,9 @@ int main(int argc, char *argv[])
 
 	// Close the files from initial TAC generation
 	fclose(yyin);
-	fclose(tac_code);
-	
-	allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers
+	fclose(tac_file);
+
+	// allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers
 
 	gen_c_code("frontend-tac.txt", "backend-c.c", 0);		// Generate C code from initial TAC
 	// gen_c_code("reg-alloc-tac.txt", "backend-reg-c.c", 1); // Generate C code from register alloc TAC

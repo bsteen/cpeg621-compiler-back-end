@@ -51,7 +51,7 @@ void yyerror(char *);	// Defined in calc.y
 		printf("token %s at line %d\n", yytext, lineNum);
 		#endif
 
-		return *yytext;
+		return *yytext;		// Return character literal as the token value
 	}
 
 "\n" {

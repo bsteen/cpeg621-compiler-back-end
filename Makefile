@@ -2,25 +2,25 @@
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
 # TO DO:
+# Add conditional expressions in
+# 	C output
 # Task 2: Reg alloc
 # 	Create forward pass
 #		Verify remove and push
 # 	Create reverse pass
-#		Create backups of neigbors instead
+#		Create backups of neighbors instead
 # 		Verify reverse pass
 # 	Check select reg function
 #	Profitable algo?
 #	Output register assignment TAC
 #	Spill all registers at end
 # 	Print out final reg alloc TAC (reg-alloc-tac.txt)
-# Do Task 1
-#	Add conditional expression
-#		Edit reg alloc to work with if/else
+# Task 1 + 3
+# 	Edit reg alloc to work with if/else including reg alloc TAC ouput file
+# Other To Do:
 # 	check output files (TAC and C) for all required features
-# 		Make sure } doesn't get a line number
-# 	Make sure freeing happens
-# 	Unnecessary temp register for assignment to user variable?
-#		Check reg alloc liveness
+# 	Make sure } doesn't get a line number
+# 	Make sure freeing happens (variable names, ints, all strdups)
 # Lab report
 
 calc: calc.l calc.y reg_alloc.c reg_alloc.h
@@ -28,6 +28,9 @@ calc: calc.l calc.y reg_alloc.c reg_alloc.h
 	flex calc.l
 	gcc -Wall lex.yy.c calc.tab.c reg_alloc.c -o calc
 
+ccode: backend-c.c
+	gcc -Wall backend-c.c
+	
 # Create calc.output for debugging
 debug:
 	bison -v calc.y
