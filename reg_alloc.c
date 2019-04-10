@@ -314,9 +314,10 @@ void gen_reg_tac(char * input_tac_file_name)
 	while(fgets(line, 128, input_tac_code) != NULL)
 	{
 		// At most 3 tokens per TAC line
-		strtok(line, " +-*/!=;")
-		strtok(NULL, " +-*/!=;")
-		strtok(NULL, " +-*/!=;")
+		strtok(line, " +-*/!=;");
+		strtok(NULL, " +-*/!=;");
+		strtok(NULL, " +-*/!=;");
+		line_num++;
 	}
 	
 	

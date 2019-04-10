@@ -307,8 +307,8 @@ void gen_c_code(char * input, char * output, int regs)
 	i = 0;
 	while(fgets(line_buf, 128, tac_file) != NULL)
 	{
-		// Don't print label if line is a closing }
-		if(strcmp(line_buf, "}\n") == 0)
+		// Don't print label if line is a closing } or else statement
+		if(strcmp(line_buf, "}\n") == 0 || strcmp(line_buf, "else {\n") == 0)
 		{
 			fprintf(c_code_file, "\t\t\t%s", line_buf);
 			continue;
