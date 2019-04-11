@@ -22,7 +22,7 @@ calc: calc.l calc.y reg_alloc.c reg_alloc.h
 ccode: c-backend.c c-reg-backend.c
 	gcc -o prog c-backend.c
 	gcc -o prog-reg c-reg-backend.c
-	
+
 # Create calc.output for debugging
 debug:
 	bison -v calc.y
