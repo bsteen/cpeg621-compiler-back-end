@@ -301,11 +301,11 @@ void gen_c_code(char * input, char * output, int regs)
 
 	// Read in TAC file, write to c file with line labels
 	// Convert lines with ** or ! and replace with pow or ~
-	char line_buf[128];
+	char line_buf[MAX_USR_VAR_NAME_LEN * 4];
 	char *bitwise;
 	char *pow;
 	i = 0;
-	while(fgets(line_buf, 128, tac_file) != NULL)
+	while(fgets(line_buf, MAX_USR_VAR_NAME_LEN * 4, tac_file) != NULL)
 	{
 		// Don't print label if line is a closing } or else statement
 		if(strcmp(line_buf, "}\n") == 0 || strcmp(line_buf, "else {\n") == 0)
@@ -323,7 +323,7 @@ void gen_c_code(char * input, char * output, int regs)
 		}
 		else if(pow != NULL)		// Split up the line with a ** and reformat it with a pow() func
 		{
-			char temp[128];
+			char temp[MAX_USR_VAR_NAME_LEN * 4];
 			strcpy(temp, line_buf);
 
 			char *first = strtok(temp, " =*;");		// Lines with ** will always have 3 operands
@@ -400,7 +400,7 @@ int main(int argc, char *argv[])
 	fclose(yyin);
 	fclose(tac_file);
 
-	allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers
+	allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers, output new TAC
 
 	gen_c_code("frontend-tac.txt", "backend-c.c", 0);		// Generate C code from initial TAC
 	gen_c_code("reg-alloc-tac.txt", "backend-reg-c.c", 1); 	// Generate C code from register alloc TAC

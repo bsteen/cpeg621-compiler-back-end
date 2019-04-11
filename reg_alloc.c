@@ -26,9 +26,6 @@ Node node_graph[MAX_TOTAL_VARS];	// Register interference graph (RIG)
 int stack_ptr = 0;					// points to next open spot at top of stack
 Node node_stack[MAX_TOTAL_VARS];
 
-
-
-
 // Given index for a node in node_graph, return variable name of that node
 // Wrapper for code_graph[index].var_name;
 char * get_node_name(int index)
@@ -175,9 +172,9 @@ void initialize_nodes(char* file_name)
 		exit(1);
 	}
 
-	char line[128];
+	char line[MAX_USR_VAR_NAME_LEN * 4];
 	int line_num = 1;
-	while(fgets(line, 128, tac_code) != NULL)
+	while(fgets(line, MAX_USR_VAR_NAME_LEN * 4, tac_code) != NULL)
 	{
 		if (strstr(line, "if(") != NULL)
 		{
@@ -333,6 +330,25 @@ void select_register(int node_idx)
 	node_graph[node_idx].assigned_reg = -1;		// Only node with MAY_SPILL can get no register assigned
 }
 
+// Write the variable to the output TAC file
+// If the variable was assigned a register, print out register instead
+void write_out_variable(FILE * fp, char * var)
+{
+	int reg = node_graph[get_node_index(var)].assigned_reg;
+	
+	if(reg != -1)
+	{
+		fprintf(fp, "_r%d", reg);
+	
+	}
+	else
+	{
+		fprintf(fp, "%s", var);	// use variable name if not assigned register
+	}
+	
+	return;
+}
+
 // Create the TAC with register assignment
 void gen_reg_tac(char * input_tac_file_name)
 {
@@ -350,17 +366,52 @@ void gen_reg_tac(char * input_tac_file_name)
 		exit(1);
 	}
 
-	char line[128];
+	char line[MAX_USR_VAR_NAME_LEN * 4];
 	int line_num = 1;
-	while(fgets(line, 128, input_tac_code) != NULL)
+	while(fgets(line, MAX_USR_VAR_NAME_LEN * 4, input_tac_code) != NULL)
 	{
-		// At most 3 tokens per TAC line
-		strtok(line, " +-*/!=;");
-		strtok(NULL, " +-*/!=;");
-		strtok(NULL, " +-*/!=;");
+		char * token = strtok(line, " =");
+		write_out_variable(ouput_tac_code, token);
+		fprintf(ouput_tac_code, " = ");
+		
+		token = strtok(NULL, " =;\n");
+		
+		while(token != NULL)
+		{
+			if(token[0] == '!')
+			{
+				if(token[1] < 'A')	// Constant value
+				{
+					fprintf(ouput_tac_code, "%s", token);
+				}
+				else	// Variable
+				{
+					fprintf(ouput_tac_code, "!");
+					write_out_variable(ouput_tac_code, token + 1);	// Don't include ! in varaible
+				}
+			}
+			else if(token[0] < '0')	// Operators: +, -, *, /, **
+			{
+				fprintf(ouput_tac_code, " %s ", token);
+			}
+			else
+			{
+				if(token[0] < 'A')	// Constant value
+				{
+					fprintf(ouput_tac_code, "%s", token);
+				}
+				else	// Variable
+				{
+					write_out_variable(ouput_tac_code, token);
+				}
+			}
+			
+			token = strtok(NULL, " =;\n");
+		}
+
+		fprintf(ouput_tac_code, ";\n");
 		line_num++;
 	}
-
 
 	fclose(ouput_tac_code);
 
@@ -433,13 +484,12 @@ void allocate_registers(char* frontend_tac_file_name)
 
 	for(i = 0; i < num_nodes; i++)
 	{
-		select_register(i);
+		select_register(i);		// Assign registers
 	}
 
 	print_node_graph();
 
-	// Create output TAC with register assignment inserted
-	gen_reg_tac(frontend_tac_file_name);
+	gen_reg_tac(frontend_tac_file_name);	// Create output TAC with register assignment inserted
 
 	return;
 }

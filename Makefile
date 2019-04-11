@@ -3,11 +3,11 @@
 
 # TO DO:
 # Task 2: Reg alloc
-# 	Register liveness needs to start on assignment line
+#	Convert variables to registers
+#		Verify
+#	Load variables into register
+#	Spill register after last use
 # 	Break register algo into blocks?
-#	Output register assignment TAC
-#	Spill all registers at end
-# 	Print out final reg alloc TAC (reg-alloc-tac.txt)
 # Task 1 + 3
 # 	Edit reg alloc to work with if/else including reg alloc TAC output file
 # Other To Do:
