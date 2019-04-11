@@ -9,7 +9,8 @@ typedef struct node
 	char var_name[MAX_USR_VAR_NAME_LEN];
 
 	int assigned_reg;						// Register variable is assigned to
-	int loaded;								// Used for TAC gen.; has the variable been loaded in a register yet
+	int loaded;								// Has variable been loaded in a register for first read
+	int dirty;								// Has the var been written to during the program while stored in a register
 	int reg_tag;							// no spill, may spill
 	int profit;								// The profitability of a variable
 
@@ -26,6 +27,9 @@ Node node_graph[MAX_TOTAL_VARS];	// Register interference graph (RIG)
 
 int stack_ptr = 0;					// points to next open spot at top of stack
 Node node_stack[MAX_TOTAL_VARS];
+
+int num_regs_to_spill = 0;			// Used in TAC generation
+int store_to_var[3];				// Which variables need to be written back to with register value
 
 // Given index for a node in node_graph, return variable name of that node
 // Wrapper for code_graph[index].var_name;
@@ -130,10 +134,12 @@ void update_node(char * var_name, int line_num, int assigned)
 		strcpy(node_graph[num_nodes].var_name, var_name);
 		node_graph[num_nodes].assigned_reg = -1;
 		node_graph[num_nodes].loaded = 0;
+		node_graph[num_nodes].dirty = 0;
+		node_graph[num_nodes].reg_tag = -1;
 		node_graph[num_nodes].profit = 1;
+		node_graph[num_nodes].num_live_periods = 1;
 		node_graph[num_nodes].live_starts[0] = line_num + 1;
 		node_graph[num_nodes].live_ends[0] = line_num + 1;
-		node_graph[num_nodes].num_live_periods = 1;
 		node_graph[num_nodes].num_neighbors = 0;
 
 		num_nodes++;
@@ -335,35 +341,84 @@ void select_register(int node_idx)
 // Write the variable to the output TAC file
 // If the variable was assigned a register, switch variable name for register
 // If the variable is in a register and is READ for the first time, load the variable into the register
-void write_out_variable(FILE * output_tac, char * output_line, char * var, int line_num)
+void write_out_variable(FILE * output_tac_file, char * output_line, char * var, int assigned, int line_num)
 {
 	int node_idx = get_node_index(var);
-	
+
 	if(node_idx == -1)
 	{
 		printf("Variable name (%s) not found when writing to reg alloc TAC file", var);
 		exit(1);
 	}
-	
+
 	int reg = node_graph[node_idx].assigned_reg;
 
 	if(reg != -1)
 	{
-		// Load variable into register on first read
-		if(node_graph[node_idx].live_starts[0] - 1 == line_num && node_graph[node_idx].loaded == 0)
+		// Load variable into register BEFORE first first read
+		// Don't do this if variable's first use is an assignment (initial value will be overwritten)
+		if(!assigned && node_graph[node_idx].live_starts[0] - 1 == line_num && node_graph[node_idx].loaded == 0)
 		{
-			fprintf(output_tac, "_r%d = %s;\n", reg, var);
+			fprintf(output_tac_file, "_r%d = %s;\n", reg, var);
 			node_graph[node_idx].loaded = 1;
 		}
-		
+
 		char reg_name[13]; 				// register name can be _r##########
 		sprintf(reg_name, "_r%d", reg);
 		strcat(output_line, reg_name);
+
+		// If a user variable stored in a register is being assigned a value, mark as dirty
+		// Ignore temporary variables (which start with an '_'), they don't need to be spilled
+		if (assigned)
+		{
+			if(var[0] != '_')
+			{
+				node_graph[node_idx].dirty = 1;
+			}
+			strcat(output_line, " = ");
+		}
+
+		int last_period_idx = node_graph[node_idx].num_live_periods - 1;
+		int last_use_line = node_graph[node_idx].live_ends[last_period_idx];
+		int dirty = node_graph[node_idx].dirty;
+		
+		// If this is the variable's last use in register and it is dirty, mark for spilling
+		// This will never happen to temp vars, since they are never marked dirty
+		if(last_use_line == line_num && dirty == 1)
+		{
+			if(num_regs_to_spill >= 3)	// Sanity check, should never happen
+			{
+				printf("Too many registers marked to be spilled");
+				exit(1);
+			}
+			
+			store_to_var[num_regs_to_spill] = node_idx;
+			num_regs_to_spill++;
+		}
 	}
-	else	// Variable was not assigned a register
+	else	// Variable was not assigned a register (don't load/store variable to/from register)
 	{
-		strcat(output_line, var);	// use variable name if not assigned register
+		strcat(output_line, var);
 	}
+
+	return;
+}
+
+// Spill register value back to variable
+// Write back value from register to variable on variable's last use
+void spill_to_var(FILE * output_tac_file)
+{
+	int i;
+	for(i = 0; i < num_regs_to_spill; i++)
+	{
+		int node_idx = store_to_var[i];
+		char * var = node_graph[node_idx].var_name;
+		int reg = node_graph[node_idx].assigned_reg;
+
+		fprintf(output_tac_file, "%s = _r%d;\n", var, reg);
+	}
+
+	num_regs_to_spill = 0;	// Reset array for next use
 
 	return;
 }
@@ -372,31 +427,31 @@ void write_out_variable(FILE * output_tac, char * output_line, char * var, int l
 void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 {
 	FILE * input_tac_file = fopen(input_tac_file_name,"r");
-	FILE * ouput_tac_file = fopen(output_tac_file_name,"w");
+	FILE * output_tac_file = fopen(output_tac_file_name,"w");
 
 	if(input_tac_file == NULL)
 	{
 		printf("Can't open input TAC file (%s) in register allocation stage", input_tac_file_name);
 		exit(1);
 	}
-	else if(ouput_tac_file == NULL)
+	else if(output_tac_file == NULL)
 	{
 		printf("Can't create output TAC file (%s) in register allocation stage", output_tac_file_name);
 		exit(1);
 	}
 
 	// Read in front end TAC and insert registers
-	char input_line[MAX_USR_VAR_NAME_LEN * 4];		// Frontend TAC line read in 
+	char input_line[MAX_USR_VAR_NAME_LEN * 4];		// Frontend TAC line read in
 	char output_line[MAX_USR_VAR_NAME_LEN * 4];		// TAC line with register assignment written out
+
 	int line_num = 1;
 
 	while(fgets(input_line, MAX_USR_VAR_NAME_LEN * 4, input_tac_file) != NULL)
 	{
 		strcpy(output_line, ""); 	// Clear output line for next use
-		
-		char * token = strtok(input_line, " =");						// Variable being assigned to
-		write_out_variable(ouput_tac_file, output_line, token, -1);		// Send -1 as linenum so var won't be stored in register
-		strcat(output_line, " = ");
+
+		char * token = strtok(input_line, " =");	// First token is always variable being assigned to
+		write_out_variable(output_tac_file, output_line, token, 1, line_num);
 
 		token = strtok(NULL, " =;\n");
 
@@ -411,7 +466,7 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 				else				// Write out !variable or !register
 				{
 					strcat(output_line, "!");
-					write_out_variable(ouput_tac_file, output_line, token + 1, line_num);	// Don't include ! in variable name
+					write_out_variable(output_tac_file, output_line, token + 1, 0, line_num);	// Don't include ! in variable name
 				}
 			}
 			else if(token[0] < '0')	// Write out operators: +, -, *, /, **
@@ -428,7 +483,7 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 				}
 				else				// Write out variable
 				{
-					write_out_variable(ouput_tac_file, output_line, token, line_num);
+					write_out_variable(output_tac_file, output_line, token, 0, line_num);
 				}
 			}
 
@@ -436,29 +491,31 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 		}
 
 		strcat(output_line, ";\n");
-		fprintf(ouput_tac_file, output_line);	// Write out the completed line
-		
+		fprintf(output_tac_file, output_line);	// Write out the completed line
+		spill_to_var(output_tac_file);			// Write back register values to vars on their last use
+
 		line_num++;
 	}
 
 	fclose(input_tac_file);
-	fclose(ouput_tac_file);
+	fclose(output_tac_file);
 
 	return;
 }
 
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
+// Then write out TAC code with register assignment
+// This is the main logic function for this file
 void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name)
 {
 	// First two functions create the RIG
 	initialize_nodes(frontend_tac_file_name);
 	find_all_neighbors();
 
-	print_node_graph();
-
-	int nodes_left = num_nodes;
+	// print_node_graph();
 
 	// Forward pass
+	int nodes_left = num_nodes;
 	while(nodes_left > 0)
 	{
 		int continue_simplify = 1;
@@ -498,7 +555,7 @@ void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name)
 		}
 	}
 
-	print_node_stack();
+	// print_node_stack();
 
 	// Reverse pass
 	int i;
@@ -519,7 +576,7 @@ void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name)
 	print_node_graph();
 
 	// Create output TAC with register assignment inserted
-	gen_reg_tac(frontend_tac_file_name, reg_tac_file_name);	
+	gen_reg_tac(frontend_tac_file_name, reg_tac_file_name);
 
 	return;
 }
