@@ -257,7 +257,7 @@ void remove_and_push(int node_idx, int node_tag)
 	{
 		int neighbor_idx = node_graph[node_idx].neighbors[i];
 		int found = 0;
-		
+
 		// Go through each neighbor's neighbor list, find index of node being removed
 		for(j = 0; j < node_graph[neighbor_idx].num_neighbors; j++)
 		{
@@ -267,13 +267,13 @@ void remove_and_push(int node_idx, int node_tag)
 				break;		// j is index in the neighbor's neighbor list that contains node to be removed
 			}
 		}
-		
+
 		if(!found)	// Make sure it actually found the correct edge and didn't just reach the end of the loop
 		{
 			printf("Did not find edge to %s in neighbor node %s's neighbor list\n", get_node_name(node_idx), get_node_name(neighbor_idx));
 			exit(1);
 		}
-		
+
 		// Reorder neighbor's neighbor list by shifting next item on top of previous
 		// Overwrites edge to node being removed from RIG in process
 		for(; j < node_graph[neighbor_idx].num_neighbors - 1; j++)
@@ -290,26 +290,28 @@ void remove_and_push(int node_idx, int node_tag)
 	node_stack[stack_ptr].reg_tag = node_tag;			// Set register tag
 	node_stack[stack_ptr].num_neighbors = 0;			// Clear pushed node's neighbor values
 	stack_ptr++;
-	
+
 	node_graph[node_idx].var_name[0] = '\0'; 			// "Remove" node from graph by making name blank
 
 	return;
 }
 
 // Select register for node that hasn't already been assigned to one of it's neighbors
-// Returns 1 if it was able to find register to assign, 0 if not
-int select_register(int node_idx)
+// All nodes with NO_SPILL will get a register; nodes with MAY_SPILL may or may not get one
+void select_register(int node_idx)
 {
-	int taken_regs[NUM_REG];
-	memset(taken_regs, 0, NUM_REG);
+	int taken_regs[NUM_REG];	// List of registers that are already used by node's neighbors
+	memset(taken_regs, 0, sizeof(int) * NUM_REG);	// Zero means register index+1 not in use
 
 	int i;
 	for(i = 0; i < node_graph[node_idx].num_neighbors; i++)
 	{
 		int neighbor_idx = node_graph[node_idx].neighbors[i];
-		if(node_graph[neighbor_idx].assigned_reg != -1)
+		int neighbor_reg_num = node_graph[neighbor_idx].assigned_reg;
+		
+		if(neighbor_reg_num != -1)
 		{
-			taken_regs[node_graph[neighbor_idx].assigned_reg] = 1;
+			taken_regs[neighbor_reg_num - 1] = 1;		// Register are r1, r2, ...
 		}
 	}
 
@@ -318,11 +320,17 @@ int select_register(int node_idx)
 		if(taken_regs[i] == 0)
 		{
 			node_graph[node_idx].assigned_reg = i + 1;	// Register are r1, r2, ...
-			return 1;
+			return;
 		}
 	}
 
-	return 0;
+	if(node_graph[node_idx].reg_tag == NO_SPILL)	// Node with NO_SPILL label should always get register
+	{
+		printf("Node %s with NO_SPILL label didn't get register\n", get_node_name(node_idx));
+		exit(1);
+	}
+	
+	node_graph[node_idx].assigned_reg = -1;		// Only node with MAY_SPILL can get no register assigned
 }
 
 // Create the TAC with register assignment
@@ -415,32 +423,20 @@ void allocate_registers(char* frontend_tac_file_name)
 	// Reverse pass
 	int i;
 	int j = 0;
-	for(i = stack_ptr - 1; i >= 0; i--)
-	{	// Put all values from stack back into graph array (top is left most, bottom is right most)
+	for(i = stack_ptr - 1; i >= 0; i--)		// Put values from stack back into graph array
+	{										// (top is left most, bottom is right most)
 		node_graph[j] = node_stack[i];
 		j++;
 	}
-
-	// TO DO: Replace with BACKUP neighbor list instead
+	
 	find_all_neighbors();		// Rebuild neighbor list
 
 	for(i = 0; i < num_nodes; i++)
 	{
-		if(node_graph[i].reg_tag == NO_SPILL)
-		{
-			select_register(i);
-		}
-		else
-		{
-			int succeeded = select_register(i);
-			if(!succeeded)
-			{
-				node_graph[i].assigned_reg = -1;
-			}
-		}
+		select_register(i);
 	}
 
-	// print_node_graph();
+	print_node_graph();
 
 	// Create output TAC with register assignment inserted
 	gen_reg_tac(frontend_tac_file_name);

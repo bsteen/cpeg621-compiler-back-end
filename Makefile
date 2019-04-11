@@ -3,10 +3,7 @@
 
 # TO DO:
 # Task 2: Reg alloc
-# 	Create reverse pass
-#		Create backups of neighbors instead
-# 		Verify reverse pass
-# 	Check select reg function (all getting assinged reg 1)
+# 	Register liveness needs to start on assignment line
 # 	Break register algo into blocks?
 #	Output register assignment TAC
 #	Spill all registers at end
@@ -17,6 +14,7 @@
 # 	check output files (TAC and C) for all required features
 # 	Make sure } doesn't get a line number
 # 	Make sure freeing happens (variable names, ints, all strdups)
+#	For reverse pass create backups of neighbors instead of recalculating
 # Lab report
 
 calc: calc.l calc.y reg_alloc.c reg_alloc.h
