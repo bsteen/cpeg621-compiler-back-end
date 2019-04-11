@@ -19,13 +19,14 @@ calc: calc.l calc.y reg_alloc.c reg_alloc.h
 	flex calc.l
 	gcc -Wall lex.yy.c calc.tab.c reg_alloc.c -o calc
 
-ccode: backend-c.c
-	gcc -Wall backend-c.c
+ccode: c-backend.c c-reg-backend.c
+	gcc -o prog c-backend.c
+	gcc -o prog-reg c-reg-backend.c
 	
 # Create calc.output for debugging
 debug:
 	bison -v calc.y
 
 clean:
-	rm -f calc.tab.* lex.yy.c calc.output calc a.out
-	rm -f frontend-tac.txt reg-alloc-tac.txt backend-c.c backend-reg-c.c
+	rm -f calc.tab.* lex.yy.c calc.output calc prog prog-reg a.out
+	rm -f tac-frontend.txt tac-reg-alloc.txt c-backend.c c-reg-backend.c

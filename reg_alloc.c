@@ -369,21 +369,19 @@ void write_out_variable(FILE * output_tac, char * output_line, char * var, int l
 }
 
 // Create the TAC with register assignment
-void gen_reg_tac(char * input_tac_file_name)
+void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 {
-	char * output_tac_file_name = "reg-alloc-tac.txt";
-	FILE * ouput_tac_file = fopen(output_tac_file_name,"w");
 	FILE * input_tac_file = fopen(input_tac_file_name,"r");
+	FILE * ouput_tac_file = fopen(output_tac_file_name,"w");
 
-	if(ouput_tac_file == NULL)
-	{
-		printf("Can't create output TAC file (%s) in register allocation stage", output_tac_file_name);
-		exit(1);
-	}
-	
 	if(input_tac_file == NULL)
 	{
 		printf("Can't open input TAC file (%s) in register allocation stage", input_tac_file_name);
+		exit(1);
+	}
+	else if(ouput_tac_file == NULL)
+	{
+		printf("Can't create output TAC file (%s) in register allocation stage", output_tac_file_name);
 		exit(1);
 	}
 
@@ -450,7 +448,7 @@ void gen_reg_tac(char * input_tac_file_name)
 }
 
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
-void allocate_registers(char* frontend_tac_file_name)
+void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name)
 {
 	// First two functions create the RIG
 	initialize_nodes(frontend_tac_file_name);
@@ -520,7 +518,8 @@ void allocate_registers(char* frontend_tac_file_name)
 
 	print_node_graph();
 
-	gen_reg_tac(frontend_tac_file_name);	// Create output TAC with register assignment inserted
+	// Create output TAC with register assignment inserted
+	gen_reg_tac(frontend_tac_file_name, reg_tac_file_name);	
 
 	return;
 }

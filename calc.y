@@ -257,7 +257,7 @@ void gen_c_code(char * input, char * output, int regs)
 	{
 		if (i != num_user_vars - 1)
 		{
-			fprintf(c_code_file, "%s, ", user_vars[i]);
+			fprintf(c_code_file, "%s = 0, ", user_vars[i]);
 		}
 		else
 		{
@@ -272,9 +272,9 @@ void gen_c_code(char * input, char * output, int regs)
 	}
 	for(i = 0; i < num_temp_vars; i++)
 	{
-		if(i != num_temp_vars - 1)
+		if(i < num_temp_vars - 1)
 		{
-			fprintf(c_code_file, "_t%d, ", i);
+			fprintf(c_code_file, "_t%d = 0, ", i);
 		}
 		else
 		{
@@ -285,12 +285,21 @@ void gen_c_code(char * input, char * output, int regs)
 	// Create register variables
 	if(regs)
 	{
-		fprintf(c_code_file, "\tint _r1, _r2, _r3, _r4 = 0;\n\n");
+		fprintf(c_code_file, "\tint ");
+		for(i = 0; i < NUM_REG; i++)
+		{
+			if(i < NUM_REG - 1)
+			{
+				fprintf(c_code_file, "_r%d = 0, ", i + 1);
+			}
+			else
+			{
+				fprintf(c_code_file, "_r%d = 0;\n", i + 1);
+			}
+		}
 	}
-	else
-	{
-		fprintf(c_code_file, "\n");
-	}
+
+	fprintf(c_code_file, "\n");
 
 	// Initialize user variables not assigned (ask user input for variables)
 	for (i = 0; i < num_user_vars_wo_def; i++)
@@ -387,7 +396,8 @@ int main(int argc, char *argv[])
 	}
 
 	// Open the output file where the three address codes will be written
-	tac_file = fopen("frontend-tac.txt", "w");
+	char * frontend_tac_name = "tac-frontend.txt";
+	tac_file = fopen(frontend_tac_name, "w");
 	if (tac_file == NULL)
 	{
 		yyerror("Couldn't create TAC file");
@@ -400,10 +410,11 @@ int main(int argc, char *argv[])
 	fclose(yyin);
 	fclose(tac_file);
 
-	allocate_registers("frontend-tac.txt");	// Take input TAC and allocate registers, output new TAC
+	char * reg_tac_file_name = "tac-reg-alloc.txt";
+	allocate_registers(frontend_tac_name, reg_tac_file_name);	// Take input TAC and allocate registers, output new TAC
 
-	gen_c_code("frontend-tac.txt", "backend-c.c", 0);		// Generate C code from initial TAC
-	gen_c_code("reg-alloc-tac.txt", "backend-reg-c.c", 1); 	// Generate C code from register alloc TAC
+	gen_c_code(frontend_tac_name, "c-backend.c", 0);		// Generate C code from initial TAC
+	gen_c_code(reg_tac_file_name, "c-reg-backend.c", 1); 	// Generate C code from register alloc TAC
 
 	return 0;
 }
