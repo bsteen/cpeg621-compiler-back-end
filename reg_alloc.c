@@ -9,6 +9,7 @@ typedef struct node
 	char var_name[MAX_USR_VAR_NAME_LEN];
 
 	int assigned_reg;						// Register variable is assigned to
+	int loaded;								// Used for TAC gen.; has the variable been loaded in a register yet
 	int reg_tag;							// no spill, may spill
 	int profit;								// The profitability of a variable
 
@@ -128,6 +129,7 @@ void update_node(char * var_name, int line_num, int assigned)
 		// Initialize node values
 		strcpy(node_graph[num_nodes].var_name, var_name);
 		node_graph[num_nodes].assigned_reg = -1;
+		node_graph[num_nodes].loaded = 0;
 		node_graph[num_nodes].profit = 1;
 		node_graph[num_nodes].live_starts[0] = line_num + 1;
 		node_graph[num_nodes].live_ends[0] = line_num + 1;
@@ -332,7 +334,8 @@ void select_register(int node_idx)
 
 // Write the variable to the output TAC file
 // If the variable was assigned a register, switch variable name for register
-void write_out_variable(FILE * fp, char * var)
+// If the variable is in a register and is READ for the first time, load the variable into the register
+void write_out_variable(FILE * output_tac, char * output_line, char * var, int line_num)
 {
 	int node_idx = get_node_index(var);
 	
@@ -346,11 +349,20 @@ void write_out_variable(FILE * fp, char * var)
 
 	if(reg != -1)
 	{
-		fprintf(fp, "_r%d", reg);
+		// Load variable into register on first read
+		if(node_graph[node_idx].live_starts[0] - 1 == line_num && node_graph[node_idx].loaded == 0)
+		{
+			fprintf(output_tac, "_r%d = %s;\n", reg, var);
+			node_graph[node_idx].loaded = 1;
+		}
+		
+		char reg_name[13]; 				// register name can be _r##########
+		sprintf(reg_name, "_r%d", reg);
+		strcat(output_line, reg_name);
 	}
 	else	// Variable was not assigned a register
 	{
-		fprintf(fp, "%s", var);	// use variable name if not assigned register
+		strcat(output_line, var);	// use variable name if not assigned register
 	}
 
 	return;
@@ -360,31 +372,33 @@ void write_out_variable(FILE * fp, char * var)
 void gen_reg_tac(char * input_tac_file_name)
 {
 	char * output_tac_file_name = "reg-alloc-tac.txt";
-	FILE * ouput_tac_code = fopen(output_tac_file_name,"w");
+	FILE * ouput_tac_file = fopen(output_tac_file_name,"w");
+	FILE * input_tac_file = fopen(input_tac_file_name,"r");
 
-	if(ouput_tac_code == NULL)
+	if(ouput_tac_file == NULL)
 	{
 		printf("Can't create output TAC file (%s) in register allocation stage", output_tac_file_name);
 		exit(1);
 	}
-
-	FILE * input_tac_code = fopen(input_tac_file_name,"r");
-
-	if(input_tac_code == NULL)
+	
+	if(input_tac_file == NULL)
 	{
 		printf("Can't open input TAC file (%s) in register allocation stage", input_tac_file_name);
 		exit(1);
 	}
 
 	// Read in front end TAC and insert registers
-	char line[MAX_USR_VAR_NAME_LEN * 4];
+	char input_line[MAX_USR_VAR_NAME_LEN * 4];		// Frontend TAC line read in 
+	char output_line[MAX_USR_VAR_NAME_LEN * 4];		// TAC line with register assignment written out
 	int line_num = 1;
 
-	while(fgets(line, MAX_USR_VAR_NAME_LEN * 4, input_tac_code) != NULL)
+	while(fgets(input_line, MAX_USR_VAR_NAME_LEN * 4, input_tac_file) != NULL)
 	{
-		char * token = strtok(line, " =");		// Variable being assigned to
-		write_out_variable(ouput_tac_code, token);
-		fprintf(ouput_tac_code, " = ");
+		strcpy(output_line, ""); 	// Clear output line for next use
+		
+		char * token = strtok(input_line, " =");						// Variable being assigned to
+		write_out_variable(ouput_tac_file, output_line, token, -1);		// Send -1 as linenum so var won't be stored in register
+		strcat(output_line, " = ");
 
 		token = strtok(NULL, " =;\n");
 
@@ -394,38 +408,43 @@ void gen_reg_tac(char * input_tac_file_name)
 			{
 				if(token[1] < 'A')	 // Write out !constant
 				{
-					fprintf(ouput_tac_code, "%s", token);
+					strcat(output_line, token);
 				}
 				else				// Write out !variable or !register
 				{
-					fprintf(ouput_tac_code, "!");
-					write_out_variable(ouput_tac_code, token + 1);	// Don't include ! in variable name
+					strcat(output_line, "!");
+					write_out_variable(ouput_tac_file, output_line, token + 1, line_num);	// Don't include ! in variable name
 				}
 			}
 			else if(token[0] < '0')	// Write out operators: +, -, *, /, **
 			{
-				fprintf(ouput_tac_code, " %s ", token);
+				strcat(output_line, " ");
+				strcat(output_line, token);
+				strcat(output_line, " ");
 			}
 			else
 			{
 				if(token[0] < 'A')	// Write out constant value
 				{
-					fprintf(ouput_tac_code, "%s", token);
+					strcat(output_line, token);
 				}
 				else				// Write out variable
 				{
-					write_out_variable(ouput_tac_code, token);
+					write_out_variable(ouput_tac_file, output_line, token, line_num);
 				}
 			}
 
 			token = strtok(NULL, " =;\n");
 		}
 
-		fprintf(ouput_tac_code, ";\n");
+		strcat(output_line, ";\n");
+		fprintf(ouput_tac_file, output_line);	// Write out the completed line
+		
 		line_num++;
 	}
 
-	fclose(ouput_tac_code);
+	fclose(input_tac_file);
+	fclose(ouput_tac_file);
 
 	return;
 }

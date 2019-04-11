@@ -3,7 +3,6 @@
 
 # TO DO:
 # Task 2: Reg alloc
-#	Load variables into register
 #	Spill register after last use
 # 	Break register algo into blocks?
 # Task 1 + 3
