@@ -147,7 +147,7 @@ void update_node(char * var_name, int line_num, int assigned)
 			node_graph[index].live_ends[n] = line_num + 1;
 			node_graph[index].num_live_periods++;
 		}
-		else	// If not being assigned, update end period time if new value occurs later
+		else	// If not being assigned, update end liveness time if new value occurs later
 		{
 			int n = node_graph[index].num_live_periods - 1;
 
@@ -305,7 +305,7 @@ void select_register(int node_idx)
 	{
 		int neighbor_idx = node_graph[node_idx].neighbors[i];
 		int neighbor_reg_num = node_graph[neighbor_idx].assigned_reg;
-		
+
 		if(neighbor_reg_num != -1)
 		{
 			taken_regs[neighbor_reg_num - 1] = 1;		// Register are r1, r2, ...
@@ -326,86 +326,98 @@ void select_register(int node_idx)
 		printf("Node %s with NO_SPILL label didn't get register\n", get_node_name(node_idx));
 		exit(1);
 	}
-	
+
 	node_graph[node_idx].assigned_reg = -1;		// Only node with MAY_SPILL can get no register assigned
 }
 
 // Write the variable to the output TAC file
-// If the variable was assigned a register, print out register instead
+// If the variable was assigned a register, switch variable name for register
 void write_out_variable(FILE * fp, char * var)
 {
-	int reg = node_graph[get_node_index(var)].assigned_reg;
+	int node_idx = get_node_index(var);
 	
+	if(node_idx == -1)
+	{
+		printf("Variable name (%s) not found when writing to reg alloc TAC file", var);
+		exit(1);
+	}
+	
+	int reg = node_graph[node_idx].assigned_reg;
+
 	if(reg != -1)
 	{
 		fprintf(fp, "_r%d", reg);
-	
 	}
-	else
+	else	// Variable was not assigned a register
 	{
 		fprintf(fp, "%s", var);	// use variable name if not assigned register
 	}
-	
+
 	return;
 }
 
 // Create the TAC with register assignment
 void gen_reg_tac(char * input_tac_file_name)
 {
-	FILE * ouput_tac_code = fopen("reg-alloc-tac.txt","w");
+	char * output_tac_file_name = "reg-alloc-tac.txt";
+	FILE * ouput_tac_code = fopen(output_tac_file_name,"w");
+
 	if(ouput_tac_code == NULL)
 	{
-		printf("Can't create output TAC file in register allocation stage");
+		printf("Can't create output TAC file (%s) in register allocation stage", output_tac_file_name);
 		exit(1);
 	}
 
 	FILE * input_tac_code = fopen(input_tac_file_name,"r");
+
 	if(input_tac_code == NULL)
 	{
-		printf("Can't open input TAC file in register allocation stage");
+		printf("Can't open input TAC file (%s) in register allocation stage", input_tac_file_name);
 		exit(1);
 	}
 
+	// Read in front end TAC and insert registers
 	char line[MAX_USR_VAR_NAME_LEN * 4];
 	int line_num = 1;
+
 	while(fgets(line, MAX_USR_VAR_NAME_LEN * 4, input_tac_code) != NULL)
 	{
-		char * token = strtok(line, " =");
+		char * token = strtok(line, " =");		// Variable being assigned to
 		write_out_variable(ouput_tac_code, token);
 		fprintf(ouput_tac_code, " = ");
-		
+
 		token = strtok(NULL, " =;\n");
-		
+
 		while(token != NULL)
 		{
 			if(token[0] == '!')
 			{
-				if(token[1] < 'A')	// Constant value
+				if(token[1] < 'A')	 // Write out !constant
 				{
 					fprintf(ouput_tac_code, "%s", token);
 				}
-				else	// Variable
+				else				// Write out !variable or !register
 				{
 					fprintf(ouput_tac_code, "!");
-					write_out_variable(ouput_tac_code, token + 1);	// Don't include ! in varaible
+					write_out_variable(ouput_tac_code, token + 1);	// Don't include ! in variable name
 				}
 			}
-			else if(token[0] < '0')	// Operators: +, -, *, /, **
+			else if(token[0] < '0')	// Write out operators: +, -, *, /, **
 			{
 				fprintf(ouput_tac_code, " %s ", token);
 			}
 			else
 			{
-				if(token[0] < 'A')	// Constant value
+				if(token[0] < 'A')	// Write out constant value
 				{
 					fprintf(ouput_tac_code, "%s", token);
 				}
-				else	// Variable
+				else				// Write out variable
 				{
 					write_out_variable(ouput_tac_code, token);
 				}
 			}
-			
+
 			token = strtok(NULL, " =;\n");
 		}
 
@@ -479,7 +491,7 @@ void allocate_registers(char* frontend_tac_file_name)
 		node_graph[j] = node_stack[i];
 		j++;
 	}
-	
+
 	find_all_neighbors();		// Rebuild neighbor list
 
 	for(i = 0; i < num_nodes; i++)
