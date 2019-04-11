@@ -31,7 +31,6 @@ char user_vars[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN + 1];			// List of all uni
 char user_vars_wo_def[MAX_USR_NUM_VARS][MAX_USR_VAR_NAME_LEN + 1];	// List of user vars used w/o definition
 
 int flex_line_num = 1;		// Used for debugging
-int tac_total_lines = 0;	// Count how many lines are in fronted TAC output file
 FILE * yyin;				// Input calc program file pointer
 FILE * tac_file;			// Three address code file pointer
 FILE * c_code_file;			// C code produced by backend file pointer
@@ -123,7 +122,7 @@ char* lc(char *str)
 	{
 		str[i] = tolower(str[i]);
 	}
-	
+
 	return str;
 }
 
@@ -131,12 +130,12 @@ char* lc(char *str)
 void gen_tac_assign(char * var, char * expr)
 {
 	track_user_var(var, 1);
-	
+
 	fprintf(tac_file, "%s = %s;\n", var, expr);
-	tac_total_lines++;
-	
+	FRONTEND_TAC_LINES++;
+
 	gen_tac_else(var);
-	
+
 	return;
 }
 
@@ -160,8 +159,8 @@ char* gen_tac_expr(char * one, char * op, char * three)
 		fprintf(tac_file, "%s = %s%s;\n", tmp_var_name, op, three);
 	}
 
-	tac_total_lines++;
-	
+	FRONTEND_TAC_LINES++;
+
 	return strdup(tmp_var_name);
 }
 
@@ -169,8 +168,8 @@ char* gen_tac_expr(char * one, char * op, char * three)
 void gen_tac_if(char * cond_expr)
 {
 	fprintf(tac_file, "if(%s) {\n", cond_expr);
-	tac_total_lines++;
-	
+	FRONTEND_TAC_LINES++;
+
 	return;
 }
 
@@ -181,7 +180,7 @@ void gen_tac_else(char * expr)
 	for (; do_gen_else > 0; do_gen_else--)
 	{
 		fprintf(tac_file, "}\nelse {\n%s = 0;\n}\n", expr);
-		tac_total_lines += 4;	// Four new lines
+		FRONTEND_TAC_LINES += 4;	// Four new lines
 	}
 
 	return;
@@ -195,7 +194,7 @@ void close_tac_if()
 	for (; do_gen_else > 0; do_gen_else--)
 	{
 		fprintf(tac_file, "}\n");
-		tac_total_lines++;
+		FRONTEND_TAC_LINES++;
 	}
 
 	return;
@@ -416,14 +415,16 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	FRONTEND_TAC_LINES = 0;
+
 	yyparse();	// Read in the input program and parse the tokens
 
 	// Close the files from initial TAC generation
 	fclose(yyin);
 	fclose(tac_file);
-	
+
 	char * reg_tac_file_name = "tac-reg-alloc.txt";
-	allocate_registers(frontend_tac_name, tac_total_lines, reg_tac_file_name);	// Take input TAC and allocate registers, output new TAC
+	allocate_registers(frontend_tac_name, reg_tac_file_name);	// Take input TAC and allocate registers, output new TAC
 
 	gen_c_code(frontend_tac_name, "c-backend.c", 0);		// Generate C code from initial TAC
 	gen_c_code(reg_tac_file_name, "c-reg-backend.c", 1); 	// Generate C code from register alloc TAC
