@@ -7,7 +7,7 @@
 typedef struct node
 {
 	char var_name[MAX_USR_VAR_NAME_LEN];
-	
+
 	int assigned_reg;						// Register variable is assigned to
 	int reg_tag;							// no spill, may spill
 	int profit;								// The profitability of a variable
@@ -26,16 +26,49 @@ Node node_graph[MAX_TOTAL_VARS];	// Register interference graph (RIG)
 int stack_ptr = 0;					// points to next open spot at top of stack
 Node node_stack[MAX_TOTAL_VARS];
 
+
+
+
+// Given index for a node in node_graph, return variable name of that node
+// Wrapper for code_graph[index].var_name;
+char * get_node_name(int index)
+{
+	if(index >= num_nodes || index < 0)
+	{
+		printf("Index out of bounds");
+		exit(1);
+	}
+
+	return node_graph[index].var_name;
+}
+
+// Helper function used by update_node
+// Find variable's node index in node_graph
+// Return -1 if variable node not found
+int get_node_index(char * var_name)
+{
+	int i = 0;
+	for(i = 0; i < num_nodes; i++)
+	{
+		if(strcmp(get_node_name(i), var_name) == 0)
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 // Used for debugging
 // Print out all nodes in RIG and their values
 void print_node_graph()
 {
-	printf("RIG: Var_name register profit [live start, live end] ... [Neighbors]\n");
+	printf("RIG: Var_name\tregister profit [live start, live end] ... [neighbors]\n");
 	int i, j;
 	for(i = 0; i < num_nodes; i++)
 	{
 		Node temp = node_graph[i];
-		printf("%s r=%d p=%d l=", temp.var_name, temp.assigned_reg, temp.profit);
+		printf("%s\tr=%d p=%d l=", temp.var_name, temp.assigned_reg, temp.profit);
 
 		for (j = 0; j < temp.num_live_periods; j++)
 		{
@@ -45,7 +78,7 @@ void print_node_graph()
 		printf("n=[");
 		for(j = 0; j < temp.num_neighbors; j++)
 		{
-			printf("%s ", node_graph[temp.neighbors[j]].var_name);
+			printf("%s ", get_node_name(temp.neighbors[j]));
 		}
 		printf("]\n");
 	}
@@ -70,31 +103,14 @@ void print_node_stack()
 			printf("%s\t%s\n", node_stack[i].var_name, "MAY_SPILL");
 		}
 	}
-	
+
 	printf("\n");
-}
-
-// Helper function used by create_node
-// Find variable's node index in node_graph
-// Return -1 if variable node not found
-int get_node_index(char * var_name)
-{
-	int i = 0;
-	for(i = 0; i < num_nodes; i++)
-	{
-		if(strcmp(node_graph[i].var_name, var_name) == 0)
-		{
-			return i;
-		}
-	}
-
-	return -1;
 }
 
 // Helper function used by initialize_nodes
 // Either creates new node entry or updates existing ones
 // Initializes or updates liveness of variable
-void create_node(char * var_name, int line_num, int assigned)
+void update_node(char * var_name, int line_num, int assigned)
 {
 	if (var_name == NULL || var_name[0] < 'A')	// Ignore empty tokens and constants
 	{
@@ -103,7 +119,7 @@ void create_node(char * var_name, int line_num, int assigned)
 
 	int index = get_node_index(var_name);
 
-	// if not found create node with live_start = live_end
+	// if not found, create node with live_start = live_end
 	if(index == -1)
 	{
 		if(num_nodes >= MAX_TOTAL_VARS)
@@ -120,13 +136,13 @@ void create_node(char * var_name, int line_num, int assigned)
 		node_graph[num_nodes].live_ends[0] = line_num + 1;
 		node_graph[num_nodes].num_live_periods = 1;
 		node_graph[num_nodes].num_neighbors = 0;
-		
+
 		num_nodes++;
 	}
 	else // The node already exists, update values
 	{
 		node_graph[index].profit++;
-		
+
 		if (assigned)	// If variable is being assigned new a value, start new liveness period
 		{
 			int n = node_graph[index].num_live_periods;
@@ -163,12 +179,19 @@ void initialize_nodes(char* file_name)
 	int line_num = 1;
 	while(fgets(line, 128, tac_code) != NULL)
 	{
-		// CHECK IF FOR IF/ELSE LINES HERE
+		if (strstr(line, "if(") != NULL)
+		{
+			strtok(line, "()");		//Skip over "if"
+			update_node(strtok(NULL, "()"), line_num, 0);
+		}
+		else if(strstr(line, "else {") == NULL && strstr(line, "}") == NULL)
+		{
+			// At most 3 tokens per TAC line
+			update_node(strtok(line, " +-*/!=;"), line_num, 1);	// First token will be variable assignment
+			update_node(strtok(NULL, " +-*/!=;"), line_num, 0);
+			update_node(strtok(NULL, " +-*/!=;"), line_num, 0);	// Will return NULL if no 3rd token
+		}
 
-		// At most 3 tokens per TAC line
-		create_node(strtok(line, " +-*/!=;"), line_num, 1);	// First token will be variable assignment
-		create_node(strtok(NULL, " +-*/!=;"), line_num, 0);
-		create_node(strtok(NULL, " +-*/!=;"), line_num, 0);	// Will return NULL if no 3rd token
 		line_num++;
 	}
 
@@ -224,42 +247,52 @@ void find_all_neighbors()
 	return;
 }
 
-// Remove all edge to neighbor nodes, push node to stack with tag, remove node from RIG, 
+// Remove all node's edges to neighbor nodes, push node to stack with tag, remove node from RIG
+// Nodes are removed from RIG by setting their name to an empty string
 void remove_and_push(int node_idx, int node_tag)
 {
 	// Remove neighbors' edges to node
 	int i, j;
-	for(i = 0; i < node_graph[node_idx].num_neighbors; i++)
+	for(i = 0; i < node_graph[node_idx].num_neighbors; i++)	// Go to each neighbor of node
 	{
 		int neighbor_idx = node_graph[node_idx].neighbors[i];
-
-		// Go through each neighbor's neighbor list, find reference to self
+		int found = 0;
+		
+		// Go through each neighbor's neighbor list, find index of node being removed
 		for(j = 0; j < node_graph[neighbor_idx].num_neighbors; j++)
 		{
 			if(node_graph[neighbor_idx].neighbors[j] == node_idx)
 			{
-				break;
+				found = 1;
+				break;		// j is index in the neighbor's neighbor list that contains node to be removed
 			}
 		}
 		
+		if(!found)	// Make sure it actually found the correct edge and didn't just reach the end of the loop
+		{
+			printf("Did not find edge to %s in neighbor node %s's neighbor list\n", get_node_name(node_idx), get_node_name(neighbor_idx));
+			exit(1);
+		}
+		
 		// Reorder neighbor's neighbor list by shifting next item on top of previous
-		// Deletes reference to self in process
-		for(j = j; j < node_graph[neighbor_idx].num_neighbors - 1; j++)
+		// Overwrites edge to node being removed from RIG in process
+		for(; j < node_graph[neighbor_idx].num_neighbors - 1; j++)
 		{
 			node_graph[neighbor_idx].neighbors[j] = node_graph[neighbor_idx].neighbors[j + 1];
 		}
-		
+
 		node_graph[neighbor_idx].num_neighbors--;
+
 	}
-	
+
 	// Push node to stack with tag
-	node_stack[stack_ptr] = node_graph[node_idx];
-	node_stack[stack_ptr].reg_tag = node_tag;
+	node_stack[stack_ptr] = node_graph[node_idx];		// Copy node from RIG to stack
+	node_stack[stack_ptr].reg_tag = node_tag;			// Set register tag
 	node_stack[stack_ptr].num_neighbors = 0;			// Clear pushed node's neighbor values
-	
 	stack_ptr++;
-	node_graph[node_idx].var_name[0] = '\0'; 			// "Remove" node from graph by making name blank
 	
+	node_graph[node_idx].var_name[0] = '\0'; 			// "Remove" node from graph by making name blank
+
 	return;
 }
 
@@ -269,7 +302,7 @@ int select_register(int node_idx)
 {
 	int taken_regs[NUM_REG];
 	memset(taken_regs, 0, NUM_REG);
-	
+
 	int i;
 	for(i = 0; i < node_graph[node_idx].num_neighbors; i++)
 	{
@@ -279,7 +312,7 @@ int select_register(int node_idx)
 			taken_regs[node_graph[neighbor_idx].assigned_reg] = 1;
 		}
 	}
-	
+
 	for(i = 0; i < NUM_REG; i++)
 	{
 		if(taken_regs[i] == 0)
@@ -288,7 +321,7 @@ int select_register(int node_idx)
 			return 1;
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -301,14 +334,14 @@ void gen_reg_tac(char * input_tac_file_name)
 		printf("Can't create output TAC file in register allocation stage");
 		exit(1);
 	}
-	
+
 	FILE * input_tac_code = fopen(input_tac_file_name,"r");
 	if(input_tac_code == NULL)
 	{
 		printf("Can't open input TAC file in register allocation stage");
 		exit(1);
 	}
-	
+
 	char line[128];
 	int line_num = 1;
 	while(fgets(line, 128, input_tac_code) != NULL)
@@ -319,36 +352,36 @@ void gen_reg_tac(char * input_tac_file_name)
 		strtok(NULL, " +-*/!=;");
 		line_num++;
 	}
-	
-	
+
+
 	fclose(ouput_tac_code);
-	
+
 	return;
 }
 
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
-void allocate_registers(char* front_tac_file_name)
+void allocate_registers(char* frontend_tac_file_name)
 {
 	// First two functions create the RIG
-	initialize_nodes(front_tac_file_name);
+	initialize_nodes(frontend_tac_file_name);
 	find_all_neighbors();
 
 	print_node_graph();
 
 	int nodes_left = num_nodes;
-	
+
 	// Forward pass
 	while(nodes_left > 0)
 	{
 		int continue_simplify = 1;
-		while(continue_simplify)	// Continue to remove nodes until no nodes where num_neighbors < NUM_REG
+		while(continue_simplify)	// Remove nodes until no nodes where num_neighbors < NUM_REG
 		{
 			continue_simplify = 0;
 			int i;
 			for(i = 0; i < num_nodes; i++)
 			{
 				// Nodes with empty name have already been removed
-				if(strcmp(node_graph[i].var_name, "") != 0 && node_graph[i].num_neighbors < NUM_REG)
+				if(strcmp(get_node_name(i), "") != 0 && node_graph[i].num_neighbors < NUM_REG)
 				{
 					remove_and_push(i, NO_SPILL);
 					nodes_left--;
@@ -356,27 +389,27 @@ void allocate_registers(char* front_tac_file_name)
 				}
 			}
 		}
-		
-		if(nodes_left > 0)
+
+		if(nodes_left > 0)	// Spill step
 		{
 			int least_profit = INT_MAX;
 			int i, least_prof_idx;
-			
+
 			for(i = 0; i < num_nodes; i++)
 			{
 				// Find variable that is least profitable
-				if(strcmp(node_graph[i].var_name, "") != 0 && node_graph[i].profit < least_profit)
+				if(strcmp(get_node_name(i), "") != 0 && node_graph[i].profit < least_profit)
 				{
 					least_prof_idx = i;
 					least_profit = node_graph[i].profit;
 				}
 			}
-			
+
 			remove_and_push(least_prof_idx, MAY_SPILL);
 			nodes_left--;
 		}
 	}
-	
+
 	print_node_stack();
 
 	// Reverse pass
@@ -387,10 +420,10 @@ void allocate_registers(char* front_tac_file_name)
 		node_graph[j] = node_stack[i];
 		j++;
 	}
-	
+
 	// TO DO: Replace with BACKUP neighbor list instead
 	find_all_neighbors();		// Rebuild neighbor list
-	
+
 	for(i = 0; i < num_nodes; i++)
 	{
 		if(node_graph[i].reg_tag == NO_SPILL)
@@ -406,11 +439,11 @@ void allocate_registers(char* front_tac_file_name)
 			}
 		}
 	}
-	
-	print_node_graph();
-	
+
+	// print_node_graph();
+
 	// Create output TAC with register assignment inserted
-	gen_reg_tac(front_tac_file_name);
-	
+	gen_reg_tac(frontend_tac_file_name);
+
 	return;
 }

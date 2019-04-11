@@ -3,13 +3,11 @@
 
 # TO DO:
 # Task 2: Reg alloc
-# 	Create forward pass
-#		Verify remove and push
 # 	Create reverse pass
 #		Create backups of neighbors instead
 # 		Verify reverse pass
-# 	Check select reg function
-#	Profitable algo?
+# 	Check select reg function (all getting assinged reg 1)
+# 	Break register algo into blocks?
 #	Output register assignment TAC
 #	Spill all registers at end
 # 	Print out final reg alloc TAC (reg-alloc-tac.txt)
