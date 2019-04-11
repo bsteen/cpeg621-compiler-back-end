@@ -506,7 +506,7 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
 // Then write out TAC code with register assignment
 // This is the main logic function for this file
-void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name)
+void allocate_registers(char * frontend_tac_file_name, int frontend_tac_lines, char * reg_tac_file_name)
 {
 	// First two functions create the RIG
 	initialize_nodes(frontend_tac_file_name);

@@ -7,4 +7,4 @@
 #define NO_SPILL				0
 #define MAY_SPILL				1
 
-void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name);
+void allocate_registers(char * frontend_tac_file_name, int frontend_tac_lines, char * reg_tac_file_name);

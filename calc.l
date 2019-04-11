@@ -8,7 +8,7 @@
 
 // #define DEBUG 			// for debugging: print tokens and their line numbers
 
-extern int lineNum; 	// line number from cal.tab.c
+extern int flex_line_num; 	// line number from cal.tab.c
 extern FILE * yyin;		// Defined in calc.y as the input file
 void yyerror(char *);	// Defined in calc.y
 
@@ -22,7 +22,7 @@ void yyerror(char *);	// Defined in calc.y
 
 [A-Za-z][A-Za-z0-9]* {	// Variable names are case insensitive
 	#ifdef DEBUG
-	printf("token %s at line %d\n", yytext, lineNum);
+	printf("token %s at line %d\n", yytext, flex_line_num);
 	#endif
 
 	yylval.str = strdup(yytext); // Must be freed in bison grammar rules
@@ -31,7 +31,7 @@ void yyerror(char *);	// Defined in calc.y
 
 [0-9]+ {
 	#ifdef DEBUG
-	printf("token %s at line %d\n", yytext, lineNum);
+	printf("token %s at line %d\n", yytext, flex_line_num);
 	#endif
 
 	yylval.str = strdup(yytext); // Must be freed in bison grammar rules
@@ -40,7 +40,7 @@ void yyerror(char *);	// Defined in calc.y
 
 "**" {
 	#ifdef DEBUG
-	printf("token %s at line %d\n", yytext, lineNum);
+	printf("token %s at line %d\n", yytext, flex_line_num);
 	#endif
 
 	return POWER;
@@ -48,7 +48,7 @@ void yyerror(char *);	// Defined in calc.y
 
 [-+()=*/!?]	{
 		#ifdef DEBUG
-		printf("token %s at line %d\n", yytext, lineNum);
+		printf("token %s at line %d\n", yytext, flex_line_num);
 		#endif
 
 		return *yytext;		// Return character literal as the token value
@@ -56,16 +56,16 @@ void yyerror(char *);	// Defined in calc.y
 
 "\n" {
 	#ifdef DEBUG
-	printf("token \\n at line %d\n", lineNum);
+	printf("token \\n at line %d\n", flex_line_num);
 	#endif
 
-	lineNum++;
+	flex_line_num++;
 	return *yytext;
 	}
 
 [ \t]+ {
 	#ifdef DEBUG
-	printf("token is whitespace(s) at line %d\n", lineNum);
+	printf("token is whitespace(s) at line %d\n", flex_line_num);
 	#endif
 	// Ignore whitespaces (return nothing)
 	}
