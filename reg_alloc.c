@@ -9,15 +9,15 @@ typedef struct node
 	char var_name[MAX_USR_VAR_NAME_LEN];
 
 	int assigned_reg;						// Register variable is assigned to
+	int undefined;							// Variables first appears without definition (i.e. no var = ...;)
 	int loaded;								// Has variable been loaded in a register for first read
 	int dirty;								// Has the var been written to while stored in a register
 	int reg_tag;							// no spill, may spill
+	
 	int profit;								// The profitability of a variable
-
 	int num_live_periods;					// Number of liveness start/end periods
 	int live_starts[MAX_LIVE_PERIODS];		// Line in TAC where variable starts life
 	int live_ends[MAX_LIVE_PERIODS];		// Last line in TAC where variable is used
-
 	int num_neighbors;						// Total number of variables this variable interferes with
 	int neighbors[MAX_TOTAL_VARS];
 } Node;
@@ -62,12 +62,12 @@ int get_node_index(char * var_name)
 // Print out all nodes in RIG and their values
 void print_node_graph()
 {
-	printf("RIG: Var_name\tregister profit [live start, live end] ... [neighbors]\n");
+	printf("RIG: Var_name\tregister profit undefined [live start, live end] ... [neighbors]\n");
 	int i, j;
 	for(i = 0; i < num_nodes; i++)
 	{
 		Node temp = node_graph[i];
-		printf("%s\tr=%d p=%d l=", temp.var_name, temp.assigned_reg, temp.profit);
+		printf("%s\tr=%d p=%d u=%d l=", temp.var_name, temp.assigned_reg, temp.profit, temp.undefined);
 
 		for (j = 0; j < temp.num_live_periods; j++)
 		{
@@ -135,9 +135,20 @@ void update_node(char * var_name, int line_num, int assigned)
 		node_graph[num_nodes].reg_tag = -1;
 		node_graph[num_nodes].profit = 1;
 		node_graph[num_nodes].num_live_periods = 1;
-		node_graph[num_nodes].live_starts[0] = line_num + 1;
-		node_graph[num_nodes].live_ends[0] = line_num + 1;
 		node_graph[num_nodes].num_neighbors = 0;
+				
+		if(assigned)
+		{
+			node_graph[num_nodes].undefined = 0;	// If variable is being assigned value, then it's defined
+			node_graph[num_nodes].live_starts[0] = line_num + 1;
+			node_graph[num_nodes].live_ends[0] = line_num + 1;
+		}
+		else
+		{
+			node_graph[num_nodes].undefined = 1;	// Variables first appears as undefined value
+			node_graph[num_nodes].live_starts[0] = line_num;
+			node_graph[num_nodes].live_ends[0] = line_num;
+		}
 
 		num_nodes++;
 	}
@@ -352,10 +363,11 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 
 	if(reg != -1)
 	{
-		// Load variable into register BEFORE first first read
-		// Don't do this if variable's first use is an assignment (initial value will be overwritten)
+		// Load undefined variable into register BEFORE first read
 		// Checks if value was already loaded to prevent unnecessary double load in edge cases (e.g.: x = a + a)
-		if(!assigned && node_graph[node_idx].live_starts[0] - 1 == line_num && node_graph[node_idx].loaded == 0)
+		// Don't do this if variable's first use is an assignment/is defined (initial value will be overwritten)
+		if(node_graph[node_idx].loaded == 0 &&  node_graph[node_idx].live_starts[0] == line_num 
+			&& node_graph[node_idx].undefined)
 		{
 			fprintf(output_tac_file, "_r%d = %s;\n", reg, var);
 			node_graph[node_idx].loaded = 1;

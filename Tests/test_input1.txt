@@ -1,15 +1,7 @@
-a
-a=a+A
-1+2
-0+1+2+9
-B = 3
-A = B + C * 1
-F = F + E
-C = (D * 2)
-testVAR = (C + 10) / 2
-Testvar = testvar ** a
-a=1+2+a
-a=1*2+(3-2)/B
-Aaa=BbBbBB
-!a
-a=!(!2*!b**2)
+z = y + 1*2
+x = a + b
+c = 1
+c + 10
+dDD = 51**2 - (3+4-1) / 2
+b = a + c
+a = 3 + 1
