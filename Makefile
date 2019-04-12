@@ -4,14 +4,16 @@
 # TO DO:
 # Task 1 + 3
 # 	Edit reg alloc to work with if/else including reg alloc TAC output file
-#	When to load register in if/else
-#	Must wait until outside if/else before spilling dirty register
+#	Order of spilling right outside if/else and issue?
+#	spilling issue var in else of nested if/elses?
+#	replace entered_if with num_nested_ifs
 # Task 2: Reg alloc
 # 	Break register algo into blocks?
 # Other To Do:
 #	Remove line count global var
 # 	check output files (TAC and C) for all required features
-# 	Make sure } doesn't get a line number
+#	Compare no reg and reg c file outputs
+# 	Check for warnings in c files
 # 	Make sure freeing happens (variable names, ints, all strdups)
 #	For reverse pass create backups of neighbors instead of recalculating
 #	Register assigning to itself in reg TAC (e.g.: _r1 = _r1;)

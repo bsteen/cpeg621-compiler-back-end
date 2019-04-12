@@ -179,8 +179,8 @@ void gen_tac_else(char * expr)
 {
 	for (; do_gen_else > 0; do_gen_else--)
 	{
-		fprintf(tac_file, "}\nelse {\n%s = 0;\n}\n", expr);
-		FRONTEND_TAC_LINES += 4;	// Four new lines
+		fprintf(tac_file, "} else {\n%s = 0;\n}\n", expr);
+		FRONTEND_TAC_LINES += 3;	// Three new lines
 	}
 
 	return;
