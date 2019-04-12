@@ -10,7 +10,7 @@ typedef struct node
 
 	int assigned_reg;						// Register variable is assigned to
 	int loaded;								// Has variable been loaded in a register for first read
-	int dirty;								// Has the var been written to during the program while stored in a register
+	int dirty;								// Has the var been written to while stored in a register
 	int reg_tag;							// no spill, may spill
 	int profit;								// The profitability of a variable
 
@@ -27,9 +27,6 @@ Node node_graph[MAX_TOTAL_VARS];	// Register interference graph (RIG)
 
 int stack_ptr = 0;					// points to next open spot at top of stack
 Node node_stack[MAX_TOTAL_VARS];
-
-int num_regs_to_spill = 0;			// Used in TAC generation
-int store_to_var[3];				// Which variables need to be written back to with register value
 
 // Given index for a node in node_graph, return variable name of that node
 // Wrapper for code_graph[index].var_name;
@@ -357,6 +354,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 	{
 		// Load variable into register BEFORE first first read
 		// Don't do this if variable's first use is an assignment (initial value will be overwritten)
+		// Checks if value was already loaded to prevent unnecessary double load in edge cases (e.g.: x = a + a)
 		if(!assigned && node_graph[node_idx].live_starts[0] - 1 == line_num && node_graph[node_idx].loaded == 0)
 		{
 			fprintf(output_tac_file, "_r%d = %s;\n", reg, var);
@@ -377,48 +375,37 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 			}
 			strcat(output_line, " = ");
 		}
-
-		int last_period_idx = node_graph[node_idx].num_live_periods - 1;
-		int last_use_line = node_graph[node_idx].live_ends[last_period_idx];
-		int dirty = node_graph[node_idx].dirty;
-		
-		// If this is the variable's last use in register and it is dirty, mark for spilling
-		// This will never happen to temp vars, since they are never marked dirty
-		if(last_use_line == line_num && dirty == 1)
-		{
-			if(num_regs_to_spill >= 3)	// Sanity check, should never happen
-			{
-				printf("Too many registers marked to be spilled");
-				exit(1);
-			}
-			
-			store_to_var[num_regs_to_spill] = node_idx;
-			num_regs_to_spill++;
-		}
 	}
-	else	// Variable was not assigned a register (don't load/store variable to/from register)
+	else	// Variable was not placed a register (don't need to load to register or mark as dirty)
 	{
 		strcat(output_line, var);
+		
+		if(assigned)
+		{
+			strcat(output_line, " = ");
+		}	
 	}
 
 	return;
 }
 
-// Spill register value back to variable
-// Write back value from register to variable on variable's last use
-void spill_to_var(FILE * output_tac_file)
+// Spill register values back to user variables on very last use if their value is dirty
+void spill_to_variables(FILE * output_tac_file, int line_num)
 {
 	int i;
-	for(i = 0; i < num_regs_to_spill; i++)
+	for(i = 0; i < num_nodes; i++)
 	{
-		int node_idx = store_to_var[i];
-		char * var = node_graph[node_idx].var_name;
-		int reg = node_graph[node_idx].assigned_reg;
-
-		fprintf(output_tac_file, "%s = _r%d;\n", var, reg);
+		int last_live_ends_idx = node_graph[i].num_live_periods - 1;
+		int last_live_ends = node_graph[i].live_ends[last_live_ends_idx];
+		int dirty = node_graph[i].dirty;
+		
+		if((last_live_ends == line_num) && dirty)
+		{
+			// printf("Spilling %s from r%d at line %d\n", node_graph[i].var_name, node_graph[i].assigned_reg, line_num);
+			fprintf(output_tac_file, "%s = _r%d;\n", node_graph[i].var_name, node_graph[i].assigned_reg);
+			node_graph[i].dirty = 0;
+		}
 	}
-
-	num_regs_to_spill = 0;	// Reset array for next use
 
 	return;
 }
@@ -448,7 +435,8 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 
 	while(fgets(input_line, MAX_USR_VAR_NAME_LEN * 4, input_tac_file) != NULL)
 	{
-		strcpy(output_line, ""); 	// Clear output line for next use
+		strcpy(output_line, ""); 							// Clear output line for next use
+		spill_to_variables(output_tac_file, line_num);		// Write back register values to vars on their last use
 
 		char * token = strtok(input_line, " =");	// First token is always variable being assigned to
 		write_out_variable(output_tac_file, output_line, token, 1, line_num);
@@ -491,11 +479,13 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 		}
 
 		strcat(output_line, ";\n");
-		fprintf(output_tac_file, output_line);	// Write out the completed line
-		spill_to_var(output_tac_file);			// Write back register values to vars on their last use
+		fprintf(output_tac_file, output_line);		// Write out the completed line
 
 		line_num++;
 	}
+	
+	// Need to spill registers of variables that die after the last TAC file line
+	spill_to_variables(output_tac_file, line_num);
 
 	fclose(input_tac_file);
 	fclose(output_tac_file);

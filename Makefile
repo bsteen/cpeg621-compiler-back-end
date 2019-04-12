@@ -11,12 +11,12 @@
 #	When to load register in if/else
 #	Must wait until outside if/else before spilling dirty register
 # Other To Do:
+#	Remove line count global var
 # 	check output files (TAC and C) for all required features
 # 	Make sure } doesn't get a line number
 # 	Make sure freeing happens (variable names, ints, all strdups)
 #	For reverse pass create backups of neighbors instead of recalculating
-#	
-#	Register assnging to itself in reg TAC (e.g.: _r1 = _r1;)
+#	Register assigning to itself in reg TAC (e.g.: _r1 = _r1;)
 # Lab report
 
 calc: calc.l calc.y reg_alloc.c reg_alloc.h
@@ -25,8 +25,8 @@ calc: calc.l calc.y reg_alloc.c reg_alloc.h
 	gcc -Wall lex.yy.c calc.tab.c reg_alloc.c -o calc
 
 ccode: c-backend.c c-reg-backend.c
-	gcc -o prog c-backend.c
-	gcc -o prog-reg c-reg-backend.c
+	gcc -o prog c-backend.c -lm
+	gcc -o prog-reg c-reg-backend.c -lm
 
 # Create calc.output for debugging
 debug:
