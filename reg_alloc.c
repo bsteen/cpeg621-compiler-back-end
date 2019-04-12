@@ -366,7 +366,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 		// Load undefined variable into register BEFORE first read
 		// Checks if value was already loaded to prevent unnecessary double load in edge cases (e.g.: x = a + a)
 		// Don't do this if variable's first use is an assignment/is defined (initial value will be overwritten)
-		if(node_graph[node_idx].loaded == 0 &&  node_graph[node_idx].live_starts[0] == line_num 
+		if(!node_graph[node_idx].loaded && node_graph[node_idx].live_starts[0] == line_num 
 			&& node_graph[node_idx].undefined)
 		{
 			fprintf(output_tac_file, "_r%d = %s;\n", reg, var);

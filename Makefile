@@ -2,14 +2,12 @@
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
 # TO DO:
-# Task 2: Reg alloc
-#	Spill register after last use
-#		Verify
-# 	Break register algo into blocks?
 # Task 1 + 3
 # 	Edit reg alloc to work with if/else including reg alloc TAC output file
 #	When to load register in if/else
 #	Must wait until outside if/else before spilling dirty register
+# Task 2: Reg alloc
+# 	Break register algo into blocks?
 # Other To Do:
 #	Remove line count global var
 # 	check output files (TAC and C) for all required features
