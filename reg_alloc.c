@@ -497,16 +497,16 @@ void after_if_spill(FILE * output_tac_file, int if_num)
 		if_spill_tracker.num_spilled2 = 0;	// Reset for next use
 	}
 
-	printf("Spilling variables from if#%d: ", if_num);
+	// printf("Spilling variables from if#%d: ", if_num);
 
 	int i;
 	for(i = 0; i < num_spilled; i++)
 	{
 		int node_idx = vars_spilled[i];
 		fprintf(output_tac_file, "%s = _r%d;\n", node_graph[node_idx].var_name, node_graph[node_idx].assigned_reg);
-		printf("%s ", node_graph[node_idx].var_name);
+		// printf("%s ", node_graph[node_idx].var_name);
 	}
-	printf("\n");
+	// printf("\n");
 
 	return;
 }
@@ -581,13 +581,13 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 			{
 				if_spill_tracker.inside_if_1 = 1;
 				if_spill_tracker.if_1_start_line = line_num;
-				printf("if 1 starts at line# %d\n", line_num);
+				// printf("if 1 starts at line# %d\n", line_num);
 			}
 			else
 			{
 				if_spill_tracker.inside_if_2 = 1;
 				if_spill_tracker.if_2_start_line = line_num;
-				printf("if 2 starts at line# %d\n", line_num);
+				// printf("if 2 starts at line# %d\n", line_num);
 			}
 
 			fprintf(output_tac_file, output_line);		// Write out the completed line
