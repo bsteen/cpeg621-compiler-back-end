@@ -7,4 +7,5 @@
 #define NO_SPILL				0
 #define MAY_SPILL				1
 
+void remove_self_assignment(char * input_reg_tac, char * output_reg_tac);
 void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name);

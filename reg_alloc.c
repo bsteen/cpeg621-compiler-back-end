@@ -678,6 +678,59 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 	return;
 }
 
+// Goes through the tac file with register assignments, looks for unneeded 
+// self assignment lines like "_r1 = _r1;" and removes them
+// This is a simple optimization that generates a new file
+void remove_self_assignment(char * input_reg_tac, char * output_reg_tac)
+{
+	FILE * input_file = fopen(input_reg_tac, "r");
+	if(input_file == NULL)
+	{
+		printf("Unable to open for reading %s for self assignment removal\n", input_reg_tac);
+		return;
+	}
+	
+	FILE * output_file = fopen(output_reg_tac, "w");
+	if(output_file == NULL)
+	{
+		printf("Unable to create for writing %s for self assignment removal\n", output_reg_tac);
+		return;
+	}
+	
+	char input_line[MAX_USR_VAR_NAME_LEN * 4];
+	while(fgets(input_line, MAX_USR_VAR_NAME_LEN * 4, input_file) != NULL)
+	{
+		char temp[MAX_USR_VAR_NAME_LEN * 4];
+		char * token1;
+		char * token2;
+		char * token3;
+		
+		strcpy(temp, input_line);	// Copy to temp so input_line isn't edited by strtok
+		
+		token1 = strtok(temp, " =;\n");		// token1 must match token2
+		token2 = strtok(NULL, " =;\n");
+		token3 = strtok(NULL, " =;\n");		// token 3 must be empty (self assigns only have 2 variables)
+		
+		// printf("token1=%s, token2=%s, token3=%s\n", token1, token2, token3);
+		
+		if(token1 != NULL && token2 != NULL)	// Can't send strcmp a NULL string
+		{
+			if((strcmp(token1, token2) == 0) && (token3 == NULL))
+			{
+				printf("REMOVED: %s", input_line);	
+				continue;	// Don't write self assignment line to output file
+			}
+		}
+		
+		fprintf(output_file, "%s", input_line); // Copy input line to output file without editing it
+	}
+	
+	fclose(input_file);
+	fclose(output_file);
+	
+	return;
+}
+
 // Allocate registers using a RIG and a heuristic "optimistic" algorithm
 // Then write out TAC code with register assignment
 // This is the main logic function for this file
@@ -750,7 +803,7 @@ void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name)
 
 	print_node_graph();
 
-	// Create output TAC with register assignment inserted
+	// Create unoptimized output TAC with register assignment inserted
 	gen_reg_tac(frontend_tac_file_name, reg_tac_file_name);
 
 	return;
