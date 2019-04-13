@@ -419,41 +419,57 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 	return;
 }
 
-// Spill register values back to user variables on very last use if their value is dirty
+// Spill register values back to user variables if their register value is dirty
+// and they are at the end of a liveness period (conservative spilling algo)
+// 
 void spill_to_variables(FILE * output_tac_file, int line_num)
 {
 	int i;
-	for(i = 0; i < num_nodes; i++)
+	for(i = 0; i < num_nodes; i++)	// Go through each variable and see if it needs to be spilled
 	{
-		int last_live_period_idx = node_graph[i].num_live_periods - 1;
-		int last_live_ends = node_graph[i].live_ends[last_live_period_idx];
-		int dirty = node_graph[i].dirty;
-
-		if((last_live_ends == line_num) && dirty)
+		if(node_graph[i].dirty)
 		{
-			// printf("Spilling %s from r%d at line %d\n", node_graph[i].var_name, node_graph[i].assigned_reg, line_num);
-			fprintf(output_tac_file, "%s = _r%d;\n", node_graph[i].var_name, node_graph[i].assigned_reg);
-			node_graph[i].dirty = 0;
-
-			int last_live_start = node_graph[i].live_starts[last_live_period_idx];
-
-			if(if_spill_tracker.inside_if_2 && (last_live_start < if_spill_tracker.if_2_start_line))
+			int num_live_periods = node_graph[i].num_live_periods;
+			int do_spill = 0;
+			int j;
+			
+			// See if one of the variable's liveness periods ends at current line
+			for(j = 0; j < num_live_periods; j++)
 			{
-				if_spill_tracker.vars_spilled2[if_spill_tracker.num_spilled2] = i;
-				
-				printf("Spilled inside if#2: %s (idx=%d) ", node_graph[i].var_name, if_spill_tracker.num_spilled2);
-				printf("(%s last start at line %d)\n", node_graph[i].var_name,  last_live_start);
-				
-				if_spill_tracker.num_spilled2++;
+				if(node_graph[i].live_ends[j] == line_num)
+				{
+					do_spill = 1;
+					break;
+				}
 			}
-			else if(if_spill_tracker.inside_if_1 && (last_live_start < if_spill_tracker.if_1_start_line))
+			
+			// Spill the register back to the user variable
+			if(do_spill)
 			{
-				if_spill_tracker.vars_spilled1[if_spill_tracker.num_spilled1] = i;
-				
-				printf("Spilled inside if#1: %s (idx=%d) ", node_graph[i].var_name, if_spill_tracker.num_spilled1);
-				printf("(%s last start at line %d)\n", node_graph[i].var_name,  last_live_start);
-				
-				if_spill_tracker.num_spilled1++;
+				fprintf(output_tac_file, "%s = _r%d;\n", node_graph[i].var_name, node_graph[i].assigned_reg);
+				node_graph[i].dirty = 0;	// Reset dirty value
+
+				int current_live_start = node_graph[i].live_starts[j];	// Get the starting point of the current live period
+
+				// Handle case where variable is spilled inside an if/else statement
+				if(if_spill_tracker.inside_if_2 && (current_live_start < if_spill_tracker.if_2_start_line))
+				{
+					if_spill_tracker.vars_spilled2[if_spill_tracker.num_spilled2] = i;
+					if_spill_tracker.num_spilled2++;
+					
+					// If var was defined even before the start of outer if statement, it also needs to be spilled
+					// in the outer if statement incase the inner if statement is not run
+					if((current_live_start < if_spill_tracker.if_1_start_line))
+					{
+						if_spill_tracker.vars_spilled1[if_spill_tracker.num_spilled1] = i;
+						if_spill_tracker.num_spilled1++;
+					}
+				}
+				else if(if_spill_tracker.inside_if_1 && (current_live_start < if_spill_tracker.if_1_start_line))
+				{
+					if_spill_tracker.vars_spilled1[if_spill_tracker.num_spilled1] = i;
+					if_spill_tracker.num_spilled1++;
+				}
 			}
 		}
 	}
