@@ -17,8 +17,8 @@ char* lc(char *str);
 void gen_tac_assign(char * var, char * expr);
 char* gen_tac_expr(char * one, char * op, char * three);
 void gen_tac_if(char * cond_expr);
-void gen_tac_else(char * expr);
-void close_tac_if();
+void gen_tac_assign_else(char * expr);
+void gen_tac_empty_else();
 void track_user_var(char * var, int assigned);
 void gen_c_code();
 void yyerror(const char *);
@@ -71,7 +71,7 @@ FILE * c_code_file;			// C code produced by backend file pointer
 %%
 
 calc :
-	calc expr '\n'		{ my_free($2); close_tac_if(); }
+	calc expr '\n'		{ my_free($2); gen_tac_empty_else(); }
 	|
 	;
 
@@ -89,8 +89,8 @@ expr :
 	| '(' expr ')' '?' { gen_tac_if($2); } '(' expr ')'
 						{
 							$$ = $7;
-							do_gen_else++;	// Setting this will either create else with assignment of
-							my_free($2);	// zero or just close if statement if there is no assignment
+							do_gen_else++;	// Keep track of how many closing elses are need for 
+							my_free($2);	// nested if/else cases
 						}
 	;
 
@@ -134,7 +134,7 @@ void gen_tac_assign(char * var, char * expr)
 	fprintf(tac_file, "%s = %s;\n", var, expr);
 	FRONTEND_TAC_LINES++;
 
-	gen_tac_else(var);
+	gen_tac_assign_else(var);
 
 	return;
 }
@@ -174,8 +174,8 @@ void gen_tac_if(char * cond_expr)
 }
 
 // Print out closing brace of if statement and the whole else statement
-// else will always be a variable being assigned to a value of zero
-void gen_tac_else(char * expr)
+// else will be a variable being assigned to a value of zero
+void gen_tac_assign_else(char * expr)
 {
 	for (; do_gen_else > 0; do_gen_else--)
 	{
@@ -187,14 +187,13 @@ void gen_tac_else(char * expr)
 }
 
 // If the result of the conditional expression is not being written to a variable
-// the else part won't be printed, but the if statement's closing bracket still needs
-// to be printed
-void close_tac_if()
+// the else part will be empty
+void gen_tac_empty_else()
 {
 	for (; do_gen_else > 0; do_gen_else--)
 	{
-		fprintf(tac_file, "}\n");
-		FRONTEND_TAC_LINES++;
+		fprintf(tac_file, "} else {\n}\n");
+		FRONTEND_TAC_LINES += 2;
 	}
 
 	return;
@@ -328,7 +327,7 @@ void gen_c_code(char * input, char * output, int regs)
 	while(fgets(line_buf, MAX_USR_VAR_NAME_LEN * 4, tac_file) != NULL)
 	{
 		// Don't print label if line is a closing } or else statement
-		if(strcmp(line_buf, "}\n") == 0 || strcmp(line_buf, "else {\n") == 0)
+		if(strcmp(line_buf, "}\n") == 0 || strcmp(line_buf, "} else {\n") == 0)
 		{
 			fprintf(c_code_file, "\t\t\t%s", line_buf);
 			continue;

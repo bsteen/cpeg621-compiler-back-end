@@ -4,9 +4,7 @@
 # TO DO:
 # Task 1 + 3
 # 	Edit reg alloc to work with if/else including reg alloc TAC output file
-#	Order of spilling right outside if/else and issue?
-#	spilling issue var in else of nested if/elses?
-#	replace entered_if with num_nested_ifs
+# 	Need to enable conservative spilling
 # Task 2: Reg alloc
 # 	Break register algo into blocks?
 # Other To Do:

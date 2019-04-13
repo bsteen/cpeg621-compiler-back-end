@@ -13,7 +13,7 @@ typedef struct node
 	int loaded;								// Has variable been loaded in a register for first read
 	int dirty;								// Has the var been written to while stored in a register
 	int reg_tag;							// no spill, may spill
-	
+
 	int profit;								// The profitability of a variable
 	int num_live_periods;					// Number of liveness start/end periods
 	int live_starts[MAX_LIVE_PERIODS];		// Line in TAC where variable starts life
@@ -22,18 +22,28 @@ typedef struct node
 	int neighbors[MAX_TOTAL_VARS];
 } Node;
 
+// Assuming only two-deep nested ifs are allowed for this project
+typedef struct if_spills
+{
+	int inside_if_1;
+	int if_1_start_line;
+	int num_spilled1;
+	int vars_spilled1[MAX_TOTAL_VARS];
+
+	int inside_if_2;
+	int if_2_start_line;
+	int num_spilled2;
+	int vars_spilled2[MAX_TOTAL_VARS];
+
+} If_Spills;
+
+If_Spills if_spill_tracker;			// Tracks spills that occur inside if/else statements
+
 int num_nodes = 0;					// Number of notes in RIG
 Node node_graph[MAX_TOTAL_VARS];	// Register interference graph (RIG)
 
 int stack_ptr = 0;					// points to next open spot at top of stack
 Node node_stack[MAX_TOTAL_VARS];
-
-int if_start_line = 0;
-int entered_if = 0;
-int vars_spilled_in_ifs[MAX_TOTAL_VARS];
-int num_vars_spilled_in_ifs = 0;
-int spilled_per_if[MAX_NESTED_IFS];
-int num_nested_ifs = 0;
 
 // Given index for a node in node_graph, return variable name of that node
 // Wrapper for code_graph[index].var_name;
@@ -88,6 +98,7 @@ void print_node_graph()
 		}
 		printf("]\n");
 	}
+	printf("\n");
 
 	return;
 }
@@ -143,10 +154,10 @@ void update_node(char * var_name, int line_num, int assigned)
 		node_graph[num_nodes].profit = 1;
 		node_graph[num_nodes].num_live_periods = 1;
 		node_graph[num_nodes].num_neighbors = 0;
-				
-		if(assigned)
+
+		if(assigned)	// If variable is being assigned value on first use, then it's defined
 		{
-			node_graph[num_nodes].undefined = 0;	// If variable is being assigned value, then it's defined
+			node_graph[num_nodes].undefined = 0;
 			node_graph[num_nodes].live_starts[0] = line_num + 1;
 			node_graph[num_nodes].live_ends[0] = line_num + 1;
 		}
@@ -373,7 +384,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 		// Load undefined variable into register BEFORE first read
 		// Checks if value was already loaded to prevent unnecessary double load in edge cases (e.g.: x = a + a)
 		// Don't do this if variable's first use is an assignment/is defined (initial value will be overwritten)
-		if(!node_graph[node_idx].loaded && node_graph[node_idx].live_starts[0] == line_num 
+		if(!node_graph[node_idx].loaded && node_graph[node_idx].live_starts[0] == line_num
 			&& node_graph[node_idx].undefined)
 		{
 			fprintf(output_tac_file, "_r%d = %s;\n", reg, var);
@@ -398,11 +409,11 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 	else	// Variable was not placed a register (don't need to load to register or mark as dirty)
 	{
 		strcat(output_line, var);
-		
+
 		if(assigned)
 		{
 			strcat(output_line, " = ");
-		}	
+		}
 	}
 
 	return;
@@ -411,62 +422,96 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 // Spill register values back to user variables on very last use if their value is dirty
 void spill_to_variables(FILE * output_tac_file, int line_num)
 {
-	int i, spilled = 0;
+	int i;
 	for(i = 0; i < num_nodes; i++)
 	{
-		int last_live_ends_idx = node_graph[i].num_live_periods - 1;
-		int last_live_ends = node_graph[i].live_ends[last_live_ends_idx];
+		int last_live_period_idx = node_graph[i].num_live_periods - 1;
+		int last_live_ends = node_graph[i].live_ends[last_live_period_idx];
 		int dirty = node_graph[i].dirty;
-		
+
 		if((last_live_ends == line_num) && dirty)
 		{
 			// printf("Spilling %s from r%d at line %d\n", node_graph[i].var_name, node_graph[i].assigned_reg, line_num);
 			fprintf(output_tac_file, "%s = _r%d;\n", node_graph[i].var_name, node_graph[i].assigned_reg);
 			node_graph[i].dirty = 0;
-			
-			spilled++;
-			
-			if(entered_if)
+
+			int last_live_start = node_graph[i].live_starts[last_live_period_idx];
+
+			if(if_spill_tracker.inside_if_2 && (last_live_start < if_spill_tracker.if_2_start_line))
 			{
-				printf("Spilled inside if: %s (idx=%d)\n", node_graph[i].var_name, num_vars_spilled_in_ifs);
-				vars_spilled_in_ifs[num_vars_spilled_in_ifs] = i;
-				num_vars_spilled_in_ifs++;
+				if_spill_tracker.vars_spilled2[if_spill_tracker.num_spilled2] = i;
+				
+				printf("Spilled inside if#2: %s (idx=%d) ", node_graph[i].var_name, if_spill_tracker.num_spilled2);
+				printf("(%s last start at line %d)\n", node_graph[i].var_name,  last_live_start);
+				
+				if_spill_tracker.num_spilled2++;
+			}
+			else if(if_spill_tracker.inside_if_1 && (last_live_start < if_spill_tracker.if_1_start_line))
+			{
+				if_spill_tracker.vars_spilled1[if_spill_tracker.num_spilled1] = i;
+				
+				printf("Spilled inside if#1: %s (idx=%d) ", node_graph[i].var_name, if_spill_tracker.num_spilled1);
+				printf("(%s last start at line %d)\n", node_graph[i].var_name,  last_live_start);
+				
+				if_spill_tracker.num_spilled1++;
 			}
 		}
-	}
-	
-	if(entered_if && spilled > 0)
-	{	
-		spilled_per_if[num_nested_ifs - 1] += spilled;
-		printf("Num spilled=%d\n", spilled_per_if[num_nested_ifs - 1]);
 	}
 
 	return;
 }
 
-void after_if_spill(FILE * output_tac_file)
+// Certain registers that were spilled in the if statement also
+// need to be spilled in the else statement
+void after_if_spill(FILE * output_tac_file, int if_num)
 {
-	int num_spilled = spilled_per_if[num_nested_ifs - 1];
-	
-	num_vars_spilled_in_ifs -= num_spilled;
-	int start = num_vars_spilled_in_ifs;
-	
-	int i;
-	for(i = start; i < start + num_spilled; i++)
+	int num_spilled;
+	int * vars_spilled;
+
+	if(if_num == 1) // Outer if
 	{
-		int node_idx = vars_spilled_in_ifs[i];
-		int first_live = node_graph[node_idx].live_starts[0];
-		
-		if(first_live <= if_start_line)
-		{
-			fprintf(output_tac_file, "%s = _r%d;\n", node_graph[node_idx].var_name, node_graph[node_idx].assigned_reg);
-		}
+		num_spilled = if_spill_tracker.num_spilled1;
+		vars_spilled = if_spill_tracker.vars_spilled1;
+		if_spill_tracker.num_spilled1 = 0; 	// Reset for next use
 	}
-	
+	else 	// if_num == 2, inner if
+	{
+		num_spilled = if_spill_tracker.num_spilled2;
+		vars_spilled = if_spill_tracker.vars_spilled2;
+		if_spill_tracker.num_spilled2 = 0;	// Reset for next use
+	}
+
+	printf("Spilling variables from if#%d: ", if_num);
+
+	int i;
+	for(i = 0; i < num_spilled; i++)
+	{
+		int node_idx = vars_spilled[i];
+		fprintf(output_tac_file, "%s = _r%d;\n", node_graph[node_idx].var_name, node_graph[node_idx].assigned_reg);
+		printf("%s ", node_graph[node_idx].var_name);
+	}
+	printf("\n");
+
+	return;
+}
+
+// Initialize values of if_spill_tracker
+void init_if_spill_tracker()
+{
+	if_spill_tracker.inside_if_1 = 0;
+	if_spill_tracker.if_1_start_line = 0;
+	if_spill_tracker.num_spilled1 = 0;
+
+	if_spill_tracker.inside_if_2 = 0;
+	if_spill_tracker.if_2_start_line = 0;
+	if_spill_tracker.num_spilled2 = 0;
+
 	return;
 }
 
 // Create the TAC with register assignment
+// Reads in frontend TAC and replaces variables with assigned registers
+// Also inserts spilling
 void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 {
 	FILE * input_tac_file = fopen(input_tac_file_name,"r");
@@ -489,6 +534,9 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 
 	int line_num = 1;
 
+	// Initial tracker for spills inside ifs
+	init_if_spill_tracker();
+
 	while(fgets(input_line, MAX_USR_VAR_NAME_LEN * 4, input_tac_file) != NULL)
 	{
 		strcpy(output_line, ""); 							// Clear output line for next use
@@ -499,10 +547,10 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 		{
 			strtok(input_line, " ()");			// Skip over if
 			char * token = strtok(NULL, " ()");	// Token is value inside the ()
-			
+
 			strcat(output_line, "if(");
-			
-			if(token[0] < 'A')
+
+			if(token[0] < 'A')	// Is a constant
 			{
 				strcat(output_line, token);
 			}
@@ -510,33 +558,54 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 			{
 				write_out_variable(output_tac_file, output_line, token, 0, line_num);
 			}
-			
+
 			strcat(output_line, ") {\n");
-			
-			if_start_line = line_num;
-			entered_if = 1;
-			num_nested_ifs++;
-			
+
+			if(!if_spill_tracker.inside_if_1)
+			{
+				if_spill_tracker.inside_if_1 = 1;
+				if_spill_tracker.if_1_start_line = line_num;
+				printf("if 1 starts at line# %d\n", line_num);
+			}
+			else
+			{
+				if_spill_tracker.inside_if_2 = 1;
+				if_spill_tracker.if_2_start_line = line_num;
+				printf("if 2 starts at line# %d\n", line_num);
+			}
+
 			fprintf(output_tac_file, output_line);		// Write out the completed line
 			line_num++;
-			
+
 			continue;
 		}
-		if(strstr(input_line, "}") != NULL)	// Closing of if with no else (}) or start of else (} else {)
+		else if(strstr(input_line, "} else {") != NULL)
+		{
+			fprintf(output_tac_file, input_line);
+			line_num++;
+
+			if(if_spill_tracker.inside_if_2)
+			{
+				if_spill_tracker.inside_if_2 = 0;	// Leaving 2nd if and entering its else
+				after_if_spill(output_tac_file, 2);
+			}
+			else
+			{
+				if_spill_tracker.inside_if_1 = 0;	// Leaving 1st if and entering its else
+				after_if_spill(output_tac_file, 1);
+			}
+
+			continue;
+		}
+		else if(strstr(input_line, "}") != NULL)	// Ending of else statement
 		{
 			fprintf(output_tac_file, input_line);
 			line_num++;
 			
-			if(entered_if)	// Used to prevent spilling after closing of else statement
-			{
-				entered_if = 0;
-				after_if_spill(output_tac_file);
-				num_nested_ifs--;
-			}
-			
 			continue;
 		}
-		
+
+
 		// Not counting if/else statements, the first token will always be an assignment
 		char * token = strtok(input_line, " =");
 		write_out_variable(output_tac_file, output_line, token, 1, line_num);
@@ -579,11 +648,11 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 		}
 
 		strcat(output_line, ";\n");
-		
+
 		fprintf(output_tac_file, output_line);		// Write out the completed line
 		line_num++;
 	}
-	
+
 	// Need to spill registers of variables that die after the last TAC file line
 	spill_to_variables(output_tac_file, line_num);
 
