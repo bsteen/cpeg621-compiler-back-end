@@ -3,8 +3,6 @@
 
 # TO DO:
 # 	Verify conservative spilling and if/else statements
-#	Case where variable is defined in if()
-#	Variable is defined within the if/else statement
 # Other To Do:
 #	Remove line count global var
 # 	check output files (TAC and C) for all required features

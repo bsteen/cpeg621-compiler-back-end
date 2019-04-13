@@ -452,20 +452,20 @@ void spill_to_variables(FILE * output_tac_file, int line_num)
 				int current_live_start = node_graph[i].live_starts[j];	// Get the starting point of the current live period
 
 				// Handle case where variable is spilled inside an if/else statement
-				if(if_spill_tracker.inside_if_2 && (current_live_start < if_spill_tracker.if_2_start_line))
+				if(if_spill_tracker.inside_if_2 && (current_live_start <= if_spill_tracker.if_2_start_line))
 				{
 					if_spill_tracker.vars_spilled2[if_spill_tracker.num_spilled2] = i;
 					if_spill_tracker.num_spilled2++;
 					
 					// If var was defined even before the start of outer if statement, it also needs to be spilled
 					// in the outer if statement incase the inner if statement is not run
-					if((current_live_start < if_spill_tracker.if_1_start_line))
+					if((current_live_start <= if_spill_tracker.if_1_start_line))
 					{
 						if_spill_tracker.vars_spilled1[if_spill_tracker.num_spilled1] = i;
 						if_spill_tracker.num_spilled1++;
 					}
 				}
-				else if(if_spill_tracker.inside_if_1 && (current_live_start < if_spill_tracker.if_1_start_line))
+				else if(if_spill_tracker.inside_if_1 && (current_live_start <= if_spill_tracker.if_1_start_line))
 				{
 					if_spill_tracker.vars_spilled1[if_spill_tracker.num_spilled1] = i;
 					if_spill_tracker.num_spilled1++;
