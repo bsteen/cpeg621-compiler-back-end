@@ -4,7 +4,6 @@
 # TO DO:
 # 	Variables the are initialized inside an if else
 # Other To Do:
-#	Remove line count global var
 # 	check output files (TAC and C) for all required features
 #	Compare no reg and reg c file outputs
 # 	Check for warnings in c files

@@ -132,7 +132,6 @@ void gen_tac_assign(char * var, char * expr)
 	track_user_var(var, 1);
 
 	fprintf(tac_file, "%s = %s;\n", var, expr);
-	FRONTEND_TAC_LINES++;
 
 	gen_tac_assign_else(var);
 
@@ -159,8 +158,6 @@ char* gen_tac_expr(char * one, char * op, char * three)
 		fprintf(tac_file, "%s = %s%s;\n", tmp_var_name, op, three);
 	}
 
-	FRONTEND_TAC_LINES++;
-
 	return strdup(tmp_var_name);
 }
 
@@ -168,7 +165,6 @@ char* gen_tac_expr(char * one, char * op, char * three)
 void gen_tac_if(char * cond_expr)
 {
 	fprintf(tac_file, "if(%s) {\n", cond_expr);
-	FRONTEND_TAC_LINES++;
 
 	return;
 }
@@ -180,7 +176,6 @@ void gen_tac_assign_else(char * expr)
 	for (; do_gen_else > 0; do_gen_else--)
 	{
 		fprintf(tac_file, "} else {\n%s = 0;\n}\n", expr);
-		FRONTEND_TAC_LINES += 3;	// Three new lines
 	}
 
 	return;
@@ -193,7 +188,6 @@ void gen_tac_empty_else()
 	for (; do_gen_else > 0; do_gen_else--)
 	{
 		fprintf(tac_file, "} else {\n}\n");
-		FRONTEND_TAC_LINES += 2;
 	}
 
 	return;
@@ -413,8 +407,6 @@ int main(int argc, char *argv[])
 		yyerror("Couldn't create TAC file");
 		exit(1);
 	}
-
-	FRONTEND_TAC_LINES = 0;
 
 	yyparse();	// Read in the input program and parse the tokens
 

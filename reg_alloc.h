@@ -7,5 +7,4 @@
 #define NO_SPILL				0
 #define MAY_SPILL				1
 
-int FRONTEND_TAC_LINES;		// Count how many lines are in fronted TAC output file
 void allocate_registers(char * frontend_tac_file_name, char * reg_tac_file_name);
