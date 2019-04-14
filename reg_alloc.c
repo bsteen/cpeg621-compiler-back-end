@@ -14,7 +14,7 @@ typedef struct node
 
 	int profit;								// The profitability of a variable (used in RIG gen)
 	int reg_tag;							// no spill, may spill (used in RIG gen)
-	
+
 	int num_live_periods;					// Number of liveness start/end periods
 	int live_starts[MAX_LIVE_PERIODS];		// Line in TAC where variable starts life
 	int live_ends[MAX_LIVE_PERIODS];		// Last line in TAC where variable is used
@@ -151,7 +151,7 @@ void update_node(char * var_name, int line_num, int assigned)
 		strcpy(node_graph[num_nodes].var_name, var_name);
 		node_graph[num_nodes].assigned_reg = -1;
 		node_graph[num_nodes].dirty = 0;
-		node_graph[num_nodes].loaded = 0;	
+		node_graph[num_nodes].loaded = 0;
 		node_graph[num_nodes].profit = 1;
 		node_graph[num_nodes].reg_tag = -1;
 		node_graph[num_nodes].num_live_periods = 1;
@@ -179,7 +179,7 @@ void update_node(char * var_name, int line_num, int assigned)
 		if (assigned)	// If variable is being assigned new a value, start NEW liveness period
 		{
 			int last_period = node_graph[index].num_live_periods - 1;
-			
+
 			// Case where variable liveness ended in if/else; don't need to increment periods
 			// since it was already done
 			if(node_graph[index].live_starts[last_period] == -1)
@@ -192,13 +192,13 @@ void update_node(char * var_name, int line_num, int assigned)
 				node_graph[index].live_starts[last_period + 1] = line_num + 1;
 				node_graph[index].live_ends[last_period + 1] = line_num + 1;
 				node_graph[index].num_live_periods++;
-				
+
 				if(node_graph[index].num_live_periods >= MAX_LIVE_PERIODS)
 				{
 					printf("Max liveness periods for variable %s exceeded", node_graph[index].var_name);
 					exit(1);
 				}
-			}			
+			}
 		}
 		else	// If not being assigned, update end liveness time if new value occurs later
 		{
@@ -210,7 +210,7 @@ void update_node(char * var_name, int line_num, int assigned)
 			{
 				node_graph[index].live_starts[last_period] = line_num;
 			}
-			
+
 			// Variable is read again, so need to extend it's liveness end
 			// (takes care of -1 liveness end too)
 			if(line_num > node_graph[index].live_ends[last_period])
@@ -503,8 +503,8 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 				{
 					fprintf(output_tac_file, "_r%d = %s;\n", reg, var);
 					node_graph[node_idx].loaded = 1;
-					printf("%s is directly loaded on line %d\n", node_graph[node_idx].var_name, line_num);
-					
+					// printf("%s is directly loaded on line %d\n", node_graph[node_idx].var_name, line_num);
+
 					break;
 				}
 			}
@@ -522,7 +522,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 			{
 				node_graph[node_idx].dirty = 1;
 				node_graph[node_idx].loaded = 1;	// Prevents double load if it is assigned right before reading
-				printf("%s is loaded with assignment on line %d\n", node_graph[node_idx].var_name, line_num);
+				// printf("%s is loaded with assignment on line %d\n", node_graph[node_idx].var_name, line_num);
 			}
 			strcat(output_line, " = ");
 		}
@@ -567,12 +567,14 @@ void spill_to_variables(FILE * output_tac_file, int line_num)
 			// Spill the register back to the user variable
 			if(do_spill)
 			{
+				// printf("Spilling: %s = _r%d;\n", node_graph[i].var_name, node_graph[i].assigned_reg);
+
 				fprintf(output_tac_file, "%s = _r%d;\n", node_graph[i].var_name, node_graph[i].assigned_reg);
 				node_graph[i].dirty = 0;	// Reset dirty value
 
 				int current_live_start = node_graph[i].live_starts[j];	// Get the starting point of the current live period
 
-				// Handle cases where variable declared before if-else is spilled inside an if/else statement				
+				// Handle cases where variable declared before if-else is spilled inside an if/else statement
 				// Case where variable defined before start of inner if-else
 				if(if_spill_tracker.inside_if_2 && (current_live_start <= if_spill_tracker.if_2_start_line))
 				{
@@ -633,14 +635,14 @@ void after_if_spill(FILE * output_tac_file, int if_num)
 	return;
 }
 
-// When a variable ends a liveness period, a value will need be loaded into a 
+// When a variable ends a liveness period, a value will need be loaded into a
 // register next time it is used (either by assignment or load from memory)
 // This must run at the END of every TAC generation loop
 void mark_unloaded(int line_num)
 {
 	int i;
 	for(i = 0; i < num_nodes; i++)
-	{	
+	{
 		if(node_graph[i].var_name[0] != '_')
 		{
 			int num_live_periods = node_graph[i].num_live_periods;
@@ -650,7 +652,7 @@ void mark_unloaded(int line_num)
 				if(node_graph[i].live_ends[j] == line_num)
 				{
 					node_graph[i].loaded = 0;
-					printf("%s is unloaded on line %d\n", node_graph[i].var_name, line_num);
+					// printf("%s is unloaded on line %d\n", node_graph[i].var_name, line_num);
 					break;
 				}
 			}
@@ -745,6 +747,10 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 		}
 		else if(strstr(input_line, "} else {") != NULL)
 		{
+			fprintf(output_tac_file, input_line);	// This must be written out here so after if spills occur inside the else
+			mark_unloaded(line_num);
+			line_num++;
+				
 			if(if_spill_tracker.inside_if_2)
 			{
 				if_spill_tracker.inside_if_2 = 0;	// Leaving 2nd if and entering its else
@@ -755,10 +761,6 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 				if_spill_tracker.inside_if_1 = 0;	// Leaving 1st if and entering its else
 				after_if_spill(output_tac_file, 1);
 			}
-			
-			fprintf(output_tac_file, input_line);
-			mark_unloaded(line_num);
-			line_num++;
 
 			continue;
 		}
