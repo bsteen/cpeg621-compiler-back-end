@@ -419,9 +419,9 @@ int main(int argc, char *argv[])
 	allocate_registers(frontend_tac_name, reg_tac_file_name);			// Take input TAC and allocate registers, output new TAC
 	
 	char * opt_reg_tac_file_name = "Output/opt-tac-reg-alloc.txt";
-	remove_self_assignment(reg_tac_file_name, opt_reg_tac_file_name);	// Remove useless self assignment line
+	remove_self_assignment(reg_tac_file_name, opt_reg_tac_file_name);	// Remove useless self assignment lines from TAC
 	
-	gen_c_code(frontend_tac_name, "Output/c-backend.c", 0);				// Generate C code from initial TAC
+	gen_c_code(frontend_tac_name, "Output/c-backend.c", 0);				// Generate C code from initial TAC (has not regs)
 	gen_c_code(opt_reg_tac_file_name, "Output/c-reg-backend.c", 1); 	// Generate C code from optimized register alloc TAC
 
 	return 0;
