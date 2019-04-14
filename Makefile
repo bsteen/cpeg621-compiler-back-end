@@ -1,16 +1,6 @@
 # Benjamin Steenkamer
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
-# TO DO:
-#	Compare no reg and reg c file outputs
-#	Read instructions
-# 	check output files (TAC and C) for all required features
-# 	Make sure freeing happens (variable names, ints, all strdups)
-# Other To Do:
-# 	Break register algo into blocks?
-#	For reverse pass create backups of neighbors instead of recalculating
-# Lab report
-
 # Create calculator language compiler with frontend scanner+parser,
 # tac generation with register allocation, and backend c code output
 calc: calc.l calc.y reg_alloc.c reg_alloc.h
@@ -30,7 +20,7 @@ ccode: Output/c-backend.c Output/c-reg-backend.c
 
 # Same as above, but print warnings (will show unused labels)
 ccodew: Output/c-backend.c Output/c-reg-backend.c
-	gcc -Wall -o Output/prog Output/-backend.c -lm
+	gcc -Wall -o Output/prog Output/c-backend.c -lm
 	gcc -Wall -o Output/prog-reg Output/c-reg-backend.c -lm
 
 clean:
