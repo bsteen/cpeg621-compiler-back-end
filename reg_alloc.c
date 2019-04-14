@@ -266,6 +266,7 @@ void initialize_nodes(char* file_name)
 	char line[MAX_USR_VAR_NAME_LEN * 4];
 	while(fgets(line, MAX_USR_VAR_NAME_LEN * 4, tac_code) != NULL)
 	{
+		// Handle if-else cases first
 		if (strstr(line, "if(") != NULL)
 		{
 			if(inside_if1)
@@ -313,7 +314,7 @@ void initialize_nodes(char* file_name)
 			}
 			// should always go into one of the two above
 		}
-		else
+		else	// Normal case (not entering or leaving if/else)
 		{
 			// At most 3 tokens per TAC line
 			update_node(strtok(line, " +-*/!=;"), line_num, 1);	// First token will be variable assignment
@@ -490,7 +491,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 	{
 		// If a variable's liveness period starts on this line, and it is NOT
 		// being assigned a value, need to load variable into register first
-		// This will never need to happen for temporary variables b/c they only
+		// This will never need to happen for temporary variables b/c they
 		// will only be assigned a value once and stay in their register then entire time
 		if(!assigned && !node_graph[node_idx].loaded && var[0] != '_')
 		{
@@ -502,7 +503,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 				{
 					fprintf(output_tac_file, "_r%d = %s;\n", reg, var);
 					node_graph[node_idx].loaded = 1;
-					// printf("%s is directly loaded on line %d\n", node_graph[node_idx].var_name, line_num);
+					printf("%s is directly loaded on line %d\n", node_graph[node_idx].var_name, line_num);
 					
 					break;
 				}
@@ -521,7 +522,7 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 			{
 				node_graph[node_idx].dirty = 1;
 				node_graph[node_idx].loaded = 1;	// Prevents double load if it is assigned right before reading
-				// printf("%s is loaded with assignment on line %d\n", node_graph[node_idx].var_name, line_num);
+				printf("%s is loaded with assignment on line %d\n", node_graph[node_idx].var_name, line_num);
 			}
 			strcat(output_line, " = ");
 		}
@@ -639,17 +640,19 @@ void mark_unloaded(int line_num)
 {
 	int i;
 	for(i = 0; i < num_nodes; i++)
-	{
-		int num_live_periods = node_graph[i].num_live_periods;
-		int j;
-		
-		for(j = 0; j < num_live_periods; j++)
+	{	
+		if(node_graph[i].var_name[0] != '_')
 		{
-			if(node_graph[i].live_ends[j] == line_num)
+			int num_live_periods = node_graph[i].num_live_periods;
+			int j;
+			for(j = 0; j < num_live_periods; j++)
 			{
-				node_graph[i].loaded = 0;
-				// printf("%s is unloaded on line %d\n", node_graph[i].var_name, line_num);
-				break;
+				if(node_graph[i].live_ends[j] == line_num)
+				{
+					node_graph[i].loaded = 0;
+					printf("%s is unloaded on line %d\n", node_graph[i].var_name, line_num);
+					break;
+				}
 			}
 		}
 	}
@@ -735,15 +738,13 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 			}
 
 			fprintf(output_tac_file, output_line);		// Write out the completed line
+			mark_unloaded(line_num);
 			line_num++;
 
 			continue;
 		}
 		else if(strstr(input_line, "} else {") != NULL)
 		{
-			fprintf(output_tac_file, input_line);
-			line_num++;
-
 			if(if_spill_tracker.inside_if_2)
 			{
 				if_spill_tracker.inside_if_2 = 0;	// Leaving 2nd if and entering its else
@@ -754,12 +755,17 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 				if_spill_tracker.inside_if_1 = 0;	// Leaving 1st if and entering its else
 				after_if_spill(output_tac_file, 1);
 			}
+			
+			fprintf(output_tac_file, input_line);
+			mark_unloaded(line_num);
+			line_num++;
 
 			continue;
 		}
 		else if(strstr(input_line, "}") != NULL)	// Ending of else statement
 		{
 			fprintf(output_tac_file, input_line);
+			mark_unloaded(line_num);
 			line_num++;
 
 			continue;
@@ -808,9 +814,7 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 
 		strcat(output_line, ";\n");
 		fprintf(output_tac_file, output_line);		// Write out the completed line
-		
 		mark_unloaded(line_num);
-		
 		line_num++;
 	}
 

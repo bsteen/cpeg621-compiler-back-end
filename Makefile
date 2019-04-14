@@ -2,10 +2,7 @@
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
 # TO DO:
-#	Fix liveness issue inside if/else
-# 		Git commit
-#		Variables the are initialized inside an if else
-# 		Verify
+# 	Verify all test files
 #	Compare no reg and reg c file outputs
 #	Read instructions
 # 	check output files (TAC and C) for all required features
