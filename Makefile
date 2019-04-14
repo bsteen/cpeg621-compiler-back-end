@@ -2,7 +2,6 @@
 # CPEG 621 Lab 2 - Calculator Compiler Back End
 
 # TO DO:
-# 	Verify all test files
 #	Compare no reg and reg c file outputs
 #	Read instructions
 # 	check output files (TAC and C) for all required features

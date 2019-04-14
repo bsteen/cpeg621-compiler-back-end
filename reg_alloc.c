@@ -750,7 +750,7 @@ void gen_reg_tac(char * input_tac_file_name, char * output_tac_file_name)
 			fprintf(output_tac_file, input_line);	// This must be written out here so after if spills occur inside the else
 			mark_unloaded(line_num);
 			line_num++;
-				
+
 			if(if_spill_tracker.inside_if_2)
 			{
 				if_spill_tracker.inside_if_2 = 0;	// Leaving 2nd if and entering its else
