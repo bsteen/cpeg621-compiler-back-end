@@ -1,6 +1,6 @@
 # Benjamin Steenkamer
 # CPEG 621 Lab 2 - Calculator Compiler Back End
-
+#
 # Create calculator language compiler with frontend scanner+parser,
 # tac generation with register allocation, and backend c code output
 calc: calc.l calc.y reg_alloc.c reg_alloc.h

@@ -23,6 +23,8 @@ typedef struct node
 } Node;
 
 // Assuming only two-deep nested ifs are allowed for this project
+// Records all the variables that were spilled inside and if statement
+// so they can be properly spilled in the else statement
 typedef struct if_spills
 {
 	int inside_if_1;
@@ -470,7 +472,7 @@ void select_register(int node_idx)
 
 ////// END RIG FUNCTIONS ///////
 
-////// START TAC GEN FUNCTIONS ///////
+////// START TAC REGISTER GENERATION FUNCTIONS ///////
 
 // Write the variable to the output TAC file
 // If the variable was assigned a register, switch variable name for register
@@ -540,8 +542,8 @@ void write_out_variable(FILE * output_tac_file, char * output_line, char * var, 
 	return;
 }
 
-// Spill register values back to user variables they are at the end of a liveness period
-// AND if their register value is dirty (conservative spilling algo)
+// Spill register values back to user variables they are at the end of EVERY liveness period
+// ONLY if their register value is dirty (conservative spilling algo)
 void spill_to_variables(FILE * output_tac_file, int line_num)
 {
 	int i;
@@ -637,7 +639,7 @@ void after_if_spill(FILE * output_tac_file, int if_num)
 
 // When a variable ends a liveness period, a value will need be loaded into a
 // register next time it is used (either by assignment or load from memory)
-// This must run at the END of every TAC generation loop
+// This must run at the END of EVERY TAC generation loop
 void mark_unloaded(int line_num)
 {
 	int i;
@@ -882,7 +884,7 @@ void remove_self_assignment(char * input_reg_tac, char * output_reg_tac)
 	return;
 }
 
-////// END TAC GEN FUNCTIONS ///////
+////// END TAC REGISTER GENERATION FUNCTIONS ///////
 
 ////// START MAIN LOGIC FUNCTION ///////
 
